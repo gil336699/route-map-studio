@@ -23,6 +23,8 @@ export function createEngine(fetcher: Fetcher = fetchMap, cache: MapCache = memo
   let features: Feature[] = []
   let graph: Graph | null = null
   let loading: AbortController | null = null
+  // Counts the maps loaded, so the page can tell a picture drawn before the newest map from one after it.
+  let mapId = 0
   const graphFor = (follow: boolean) => (follow && graph && graph.nodes.length ? graph : null)
 
   async function handle(req: EngineRequest): Promise<EngineResponse> {
@@ -43,11 +45,12 @@ export function createEngine(fetcher: Fetcher = fetchMap, cache: MapCache = memo
           if (ctrl.signal.aborted) return { id: req.id, type: 'cancelled' }
           features = map.features
           graph = buildGraph(features)
+          mapId += 1
           if (loading === ctrl) loading = null
           return {
             id: req.id, type: 'loaded', bbox: copy ? copy.bbox : req.bbox, places: map.places, counts: countLayers(features),
             droppedRings: map.droppedRings, nodes: graph.nodes.length, ms: performance.now() - t0,
-            ...(copy ? { cachedAt: copy.savedAt } : {}),
+            ...(copy ? { cachedAt: copy.savedAt } : {}), mapId,
           }
         }
         case 'cancel':
@@ -57,7 +60,7 @@ export function createEngine(fetcher: Fetcher = fetchMap, cache: MapCache = memo
         case 'scene': {
           const scene = buildScene({ features, routes: req.routes, pins: req.pins, frame: req.frame, style: req.style, detail: req.detail })
           const check = printCheck(req.style, req.routes, req.pins, req.frame, scene.stats)
-          return { id: req.id, type: 'scene', svg: scene.svg, stats: scene.stats, check, frame: req.frame, mapFrame: mapFrame(req.frame, req.style) }
+          return { id: req.id, type: 'scene', svg: scene.svg, stats: scene.stats, check, frame: req.frame, mapFrame: mapFrame(req.frame, req.style), mapId }
         }
         case 'add-point': {
           const r = addPoint(req.route, req.p, graphFor(req.follow))

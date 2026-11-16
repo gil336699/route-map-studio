@@ -205,7 +205,7 @@ button, input, select { font: inherit; color: inherit; }
 .dock .tools { flex: none; width: 200px; }
 .dock .view { flex: none; width: 150px; }
 .status { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 12.5px; line-height: 1.3; padding: 0 6px; }
-.status > span:not(.spinner) { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.status > span:not(.spinner) { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .status.warn { color: var(--warn); }
 
 /* Groups inside glass are plain fills. */
@@ -382,14 +382,20 @@ kbd { font: 11px var(--font); background: var(--control); border-radius: 5px; pa
 .tooltip.above { transform: translate(-50%, -100%); }
 .tooltip kbd { margin-left: 6px; background: rgba(255, 255, 255, 0.18); color: #fff; box-shadow: none; }
 
+/* Below 1500 px the middle of a one-row dock is too narrow for the longer messages (under 400 px, and
+   93 px at 1201 px), so the status takes a row of its own, and the print leaves room for the taller dock. */
+@media (max-width: 1499px) {
+  .stage { padding-bottom: 128px; }
+  .dock { flex-wrap: wrap; border-radius: 22px; justify-content: space-between; }
+  .dock .status { order: 3; flex-basis: 100%; min-height: 28px; }
+  .checkcard { max-height: calc(100% - 76px - 128px); }
+}
+
 /* Narrow desktop */
 @media (max-width: 1200px) {
   :root { --panel-w: 330px; --card-w: 236px; }
-  .dock { flex-wrap: wrap; border-radius: 22px; justify-content: space-between; }
-  .dock .status { order: 3; flex-basis: 100%; min-height: 28px; }
   .dock .view { width: 132px; }
   .dock .tools { width: 180px; }
-  .checkcard { max-height: calc(100% - 76px - 128px); }
 }
 
 /* Tablet and phone: the print on top, everything else below it, in one column. */
@@ -400,6 +406,8 @@ kbd { font: 11px var(--font); background: var(--control); border-radius: 5px; pa
   .topbar { order: -1; justify-content: flex-end; flex-wrap: wrap; border-radius: 22px; }
   .dock { order: 1; border-radius: 22px; flex-wrap: wrap; }
   .dock .status { order: 3; flex-basis: 100%; min-height: 28px; }
+  /* In one column the dock is not over the print, so a long message shows in full. */
+  .dock .status > span:not(.spinner) { display: block; overflow: visible; }
   .dock .tools, .dock .view { flex: 1 1 auto; width: auto; }
   .checkcard { order: 2; overflow: visible; }
   .panel { order: 3; }

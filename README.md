@@ -30,13 +30,13 @@ Every push to `main` is built and published to GitHub Pages by `.github/workflow
 - **Print.** The print fills the window at its real proportions, on the shirt colour. What you see is exactly what exports. The layers are named after what they hold, and each route's layer after the route.
 - **Left panel.** Five tabs in the order a designer works: **Place** (find the area, download the map), **Route** (routes, drawing, landmarks and pins), **Look** (starting looks, inks, shirt, layers, route line, detail), **Text** (title, distance, key) and **Export** (print size, files).
 - **Top right.** Open, Save project (a dot means unsaved changes), Export SVG and **?** for help. Below it, the **print check**: the inks the print needs, the ink limit, and any warnings.
-- **Bottom.** The Draw, Pin and Move tools, the status, and the switch between the print and the print **On shirt**.
+- **Bottom.** The Draw, Pin and Move tools, the status, and the switch between the print and the print **On shirt**. While a map downloads or is drawn, a card on the print says so.
 
-On a narrow window the panels slim down; on a tablet or phone the print sits on top and everything else follows below it, in one column.
+In a window under 1500 px wide the status gets a row of its own under the tools, so long messages show in full. On a narrow window the panels slim down; on a tablet or phone the print sits on top and everything else follows below it, in one column.
 
 ## Help in the app
 
-Every control describes itself on hover or keyboard focus, with its shortcut. Unavailable controls say why, for example "A loop needs at least 3 points." A three-step quick start greets first visits, with an example to start from, and **?** lists every shortcut. Clearing or deleting a route, and opening a project over unsaved work, ask first.
+Every control describes itself, with its shortcut, when you hover over it or Tab to it (a click does not pop one up). Unavailable controls say why, for example "A loop needs at least 3 points." A three-step quick start greets first visits, with an example to start from, and **?** lists every shortcut. Clearing or deleting a route, and opening a project over unsaved work, ask first.
 
 ## Workflow
 
@@ -179,7 +179,7 @@ npm run preview   # serve the production build
 | Folder | What is there |
 | --- | --- |
 | `src/map/` | The engine, plain TypeScript: projection, simplify and clip, OSM parsing, routing graph, routes, landmarks, inks and the SVG scene. |
-| `src/lib/` | Overpass and Nominatim requests, project files, presets and looks, units, print check, files, document helpers, the worker hook. |
+| `src/lib/` | Overpass and Nominatim requests, project files, presets and looks, units, print check, files, document helpers, the worker hook, and the card the print shows while it waits for a map. |
 | `src/worker/` | The map engine worker and its messages. |
 | `src/components/` | The interface: viewport, panels, dock, top bar, print check, dialogs, tooltip layer and controls. |
 | `docs/` | Research notes with sources. |

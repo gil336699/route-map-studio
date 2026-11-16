@@ -19,6 +19,7 @@ import type { PlaceResult } from './lib/nominatim'
 import { LOOKS, type Look } from './lib/presets'
 import { parseProject, serializeProject } from './lib/project'
 import { useEngine } from './lib/useEngine'
+import { waitingCard } from './lib/waiting'
 import { PLACE_ICON } from './map/places'
 import { emptyRoute, routeFromTrack, undoPoint } from './map/route'
 import { parseRouteFile } from './map/routefile'
@@ -121,6 +122,15 @@ export default function App() {
     setView('print')
   }, [])
 
+  // While the example works out its route, the print's card stays up until the picture with the route
+  // arrives, so the print never shows blank or half done in between. `holdFor` is that route's id.
+  const [preparing, setPreparing] = useState<string | null>(null)
+  const holdFor = useRef<string | null>(null)
+  const release = useCallback(() => {
+    holdFor.current = null
+    setPreparing(null)
+  }, [])
+
   // Drawing: the newest request wins, and only one is with the worker at a time.
   const sceneReq = useMemo(
     () => ({ frame: doc.frame, style: doc.style, detail: doc.detail, routes: doc.routes, pins: doc.pins }),
@@ -137,12 +147,17 @@ export default function App() {
         const req = pendingScene.current
         pendingScene.current = null
         const res = await call({ type: 'scene', ...req })
-        if (res.type === 'scene') setScene(res)
-        else if (res.type === 'error') say(`The print could not be drawn: ${res.message}`, 'warn')
+        if (res.type === 'scene') {
+          setScene(res)
+          if (req.routes.some((r) => r.id === holdFor.current && r.route.points.length > 0)) release()
+        } else if (res.type === 'error') {
+          release()
+          say(`The print could not be drawn: ${res.message}`, 'warn')
+        }
       }
       sceneBusy.current = false
     })()
-  }, [sceneReq, loaded, call, say])
+  }, [sceneReq, loaded, call, say, release])
 
   // Downloading. A newer download replaces an older one.
   const loadSeq = useRef(0)
@@ -387,6 +402,7 @@ export default function App() {
     try {
       const state = parseProject(await file.text())
       if (!state.routes.length) state.routes = [nextRoute(state, lookIdOf(state.style, LOOKS) || 'vintage')]
+      release()
       latestRoute.current.clear()
       setDoc(state)
       setVersion((v) => {
@@ -406,6 +422,7 @@ export default function App() {
   }
 
   const runExample = async () => {
+    release()
     const fresh = newDoc()
     latestRoute.current.clear()
     setDoc(fresh)
@@ -418,8 +435,14 @@ export default function App() {
     if (!ok) return
     const id = fresh.routes[0]?.id
     if (!id) return
+    holdFor.current = id
+    setPreparing('Drawing the example route…')
     const res = await call({ type: 'route-from-points', points: EXAMPLE, follow: true, loop: true })
-    if (res.type !== 'route') return
+    if (res.type !== 'route' || !res.route.points.length) {
+      release()
+      if (res.type === 'error') say(`The example route could not be drawn: ${res.message}`, 'warn')
+      return
+    }
     setRoute(id, res.route)
     edit((x) => {
       const routes = x.routes.map((r) => (r.id === id ? { ...r, name: 'Banks loop', route: res.route } : r))
@@ -507,6 +530,10 @@ export default function App() {
   const shownMap = scene?.mapFrame ?? viewMap
   const hasPoints = doc.routes.some((r) => r.route.points.length > 0)
   const exportReason = !scene ? 'The print is still being drawn.' : exporting
+  const waiting = waitingCard({
+    downloading: loadingSince !== null, preparing, loadedMapId: loaded?.mapId ?? null,
+    shown: scene ? { mapId: scene.mapId, byLayer: scene.stats.byLayer } : null,
+  })
 
   return (
     <div className="app">
@@ -518,7 +545,7 @@ export default function App() {
         tool={tool}
         points={selected?.route.points ?? []}
         paper={paper}
-        busy={loadingSince !== null && !loaded}
+        busy={waiting}
         empty={!loaded && !hasPoints}
         view={view}
         onPick={onPick}

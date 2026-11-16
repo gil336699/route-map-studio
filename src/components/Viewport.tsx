@@ -26,7 +26,8 @@ interface Props {
   /** The selected route's points, shown as dots while drawing. They are not exported. */
   points: LonLat[]
   paper: string
-  busy: boolean
+  /** What the print is waiting for, shown on a card with a spinner, or null. */
+  busy: string | null
   empty: boolean
   view: 'print' | 'shirt'
   onPick: (p: LonLat) => void
@@ -291,7 +292,7 @@ export function Viewport({ svg, picFrame, picMap, viewMap, tool, points, paper, 
         {busy ? (
           <div className="empty busy" role="status">
             <span className="spinner" aria-hidden="true" />
-            <strong>Downloading the map…</strong>
+            <strong>{busy}</strong>
           </div>
         ) : null}
       </div>

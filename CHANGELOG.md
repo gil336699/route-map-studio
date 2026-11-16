@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 2026-11-16
+
+- Clicking a control no longer pops up its tooltip. Tooltips show when you hover, after a short pause, or at once when you Tab to a control. Before, every click showed one right under the pointer, text fields included.
+- Long messages in the bottom bar now show in full. In a window under 1500 px wide the message gets its own row under the tools, and it can take three lines. Before, at 1280 × 720 the example's "Here is a loop along the Schuylkill…" was cut off after two lines. Even on a wide screen the long warnings were cut, such as the one about a route going the long way round.
+- The print no longer sits blank after a map downloads. A card says "Drawing the map…", or "Drawing the example route…", until the picture is in. It says "Downloading the map…" whenever the print shows no map yet, not only on the first download. Before, the card went away as soon as the download finished, so the print stayed empty for a moment. Opening the example over another map left it empty, with no word why, for the whole download.
+- In a window about 1100 × 700, the bottom bar no longer covers the bottom 13 px of the print.
+
 ## 0.1.1 2026-11-15
 
 - A demo at the top of the README, and as a video on the release: the example loop along the Schuylkill, a café and the Philadelphia Museum of Art ticked as landmarks, the Marathon shirt look held to one ink, the print on a shirt and the SVG export. It was recorded with a saved copy of the OpenStreetMap data, because the public map servers were overloaded that day.

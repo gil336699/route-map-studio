@@ -89,6 +89,27 @@ describe('map engine', () => {
     expect(cancel.type).toBe('cancelled')
     expect((await pending).type).toBe('cancelled')
   })
+  it('numbers each map it loads, and says which map each picture was drawn from', async () => {
+    let fail = false
+    const engine = createEngine(async () => {
+      if (fail) throw new Error('OpenStreetMap is busy.')
+      return parseOverpass(fixture)
+    }, memoryCache())
+    const scene = (id: number) => engine.handle({ id, type: 'scene', frame: DEFAULT_FRAME, style: DEFAULT_STYLE, detail: DEFAULT_DETAIL, routes: [], pins: [] })
+    const before = await scene(1)
+    expect(before.type === 'scene' && before.mapId).toBe(0)
+    const first = await engine.handle({ id: 2, type: 'load', bbox: box, buildings: false })
+    expect(first.type === 'loaded' && first.mapId).toBe(1)
+    const after = await scene(3)
+    expect(after.type === 'scene' && after.mapId).toBe(1)
+    // A copy opened from the cache is a new map too; a failed download is not.
+    const again = await engine.handle({ id: 4, type: 'load', bbox: box, buildings: false })
+    expect(again.type === 'loaded' && again.mapId).toBe(2)
+    fail = true
+    expect((await engine.handle({ id: 5, type: 'load', bbox: box, buildings: false, fresh: true })).type).toBe('error')
+    const still = await scene(6)
+    expect(still.type === 'scene' && still.mapId).toBe(2)
+  })
 })
 
 describe('document helpers', () => {

@@ -22,6 +22,8 @@ export type EngineResponse =
       ms: number
       /** When the map came from this browser's copy, when that copy was saved. */
       cachedAt?: number
+      /** This map's number: 1 for the first map the engine loads, 2 for the next, and so on. */
+      mapId: number
     }
   | { id: number; type: 'cancelled' }
   | {
@@ -33,6 +35,8 @@ export type EngineResponse =
       /** The page and the map area this picture was drawn for. */
       frame: Frame
       mapFrame: Frame
+      /** The number of the map this picture was drawn from, or 0 if none had been loaded. */
+      mapId: number
     }
   | { id: number; type: 'route'; route: Route; note?: string }
   | { id: number; type: 'error'; message: string }
