@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 2026-11-15
+
+- A demo at the top of the README, and as a video on the release: the example loop along the Schuylkill, a café and the Philadelphia Museum of Art ticked as landmarks, the Marathon shirt look held to one ink, the print on a shirt and the SVG export. It was recorded with a saved copy of the OpenStreetMap data, because the public map servers were overloaded that day.
+- Each tab now opens at its top. Before, a tab opened as far down as the last one was scrolled: after scrolling the Route tab down to the landmarks, the Look tab opened with its starting looks out of view.
+
 ## 0.1.0 2026-11-15
 
 The first version.
