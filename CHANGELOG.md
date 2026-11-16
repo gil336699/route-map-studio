@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 2026-11-16
+
+- A new demo at the top of the README, and as a video on the release, showing what 0.2 added. In the example loop along the Schuylkill, the Draw tool drags a point off the Benjamin Franklin Parkway onto 20th Street and drags the line down 19th Street into a detour, with the dashed preview showing during each drag. A point is removed, then ⌘Z brings it back. A bakery and a bridge are ticked from the new kinds of landmark, and a pin dropped at the start gets the start and finish flag from the new icon picker. Then come the Marathon shirt look and the SVG export. Before, the demo was from 0.1.1 and showed none of the editing, the new icons or the new kinds of landmark. Like that one, it was recorded with a saved copy of the OpenStreetMap data, so its download is quicker than one from the public servers.
+
 ## 0.2.0 2026-11-16
 
 - Edit a drawn route right on the map. In the Draw tool, drag a point to move it. Drag the line, or the + halfway along a stretch, to add a detour. Click a point, then **Remove point** or Delete, to take it out. A click on a + adds a point without changing the line, ready to drag later. Only the stretches beside the point are drawn again, each the way it was drawn: along the streets, or straight. While you drag, the new way shows as a dashed line. Before, the only way to change a route was Undo point, which took the last point off the end.

@@ -4,9 +4,9 @@ Route Map Studio is a browser app that turns a running club's route into a print
 
 **Use it online:** https://gil336699.github.io/route-map-studio/
 
-![Demo: the quick start opens the example, a 3.74-mile loop along the Schuylkill in Philadelphia, on a cream print. In the landmarks list, Sister Cities Cafe and the Philadelphia Museum of Art are ticked and appear on the print as pins with labels. The Marathon shirt look turns the print red with one white ink, a huge 3.7 and a key for the coffee and museum icons. Ink limit 1 in the print check draws the route heavier, On shirt shows the print on a red T-shirt, and Export SVG downloads a 39 KB file in 1 ink.](docs/demo.gif)
+![Demo: the quick start opens the example, a 3.74-mile loop along the Schuylkill in Philadelphia, on a cream print. Pressing D shows the route's points as handles. A point on the Benjamin Franklin Parkway is dragged onto 20th Street, then the line on Race Street is dragged down 19th Street into a detour; during each drag the new way shows as a dashed line, and the loop grows to 4.67 miles. The detour's point is clicked, Remove point takes it out, and ⌘Z brings it back. In the landmarks list, Nook Bakery & Coffee Bar and Walnut Street Bridge are ticked and appear on the print as pins with a bakery and a bridge icon. Pressing P and clicking the start drops a pin, labelled Start, and the icon picker gives it the start and finish flag. The Marathon shirt look turns the print red with one white ink, a huge 4.7 and a key for bakeries, bridges and the start and finish, and Export SVG downloads a 45 KB file in 1 ink.](docs/demo.gif)
 
-[Watch the demo as a video](docs/demo.mp4) (MP4, 1920 × 1080, 23 s). The demo used a saved copy of the OpenStreetMap data for this area, so its download is quicker than one from the public servers (see Known limits).
+[Watch the demo as a video](docs/demo.mp4) (MP4, 1920 × 1080, 29 s). The demo used a saved copy of the OpenStreetMap data for this area, so its download is quicker than one from the public servers (see Known limits).
 
 Everything runs in your browser. Your routes, pins and files stay on your computer; only the map area you download is fetched, from OpenStreetMap's public servers. The last five maps you downloaded are kept in the browser for 30 days, so reopening a project or the same area needs no new download.
 
