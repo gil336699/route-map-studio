@@ -531,7 +531,8 @@ export default function App() {
           <span className="version">v{__APP_VERSION__}</span>
         </header>
         <Tabs tabs={TABS} value={tab} onChange={setTab} label="Steps" />
-        <div className="panel-body" role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+        {/* Keyed by tab, so each tab opens at its top instead of as far down as the last tab was scrolled. */}
+        <div key={tab} className="panel-body" role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
           {tab === 'place' ? (
             <PlacePanel doc={doc} edit={edit} covered={covered} loading={loadingSince !== null} onDownload={() => void download(docRef.current, !!loaded)} onPickPlace={onPickPlace}
               loaded={loaded ? { counts: loaded.counts, places: loaded.places.length, ms: loaded.ms } : null} />
