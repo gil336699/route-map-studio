@@ -29,9 +29,8 @@ const TEXT: TextStyle = {
   credit: true,
 }
 
-export const LEGEND_NAMES: Style['legendNames'] = {
-  coffee: 'Coffee stops', museum: 'Museums', water: 'Water', star: 'Landmarks', flag: 'Start',
-}
+/** No names typed yet: the key uses each icon's own name (see ICONS). */
+export const LEGEND_NAMES: Style['legendNames'] = {}
 
 function look(
   id: string,
@@ -52,7 +51,7 @@ function look(
       shirt: base.shirt,
       shape: base.shape ?? 'rect',
       layers,
-      route: { widthPt: 4, outline: true, markers: true, dashed: false, ...route },
+      route: { widthPt: 4, outline: true, markers: true, ...route },
       distance: { units: 'km', markers: more.markers ?? false, every: 1 },
       pinColor: more.pinColor,
       legendNames: { ...LEGEND_NAMES },

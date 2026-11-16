@@ -23,14 +23,34 @@ describe('units', () => {
 })
 
 describe('project files', () => {
+  const shown = { ...DEFAULT_STYLE, layers: { ...DEFAULT_STYLE.layers, buildings: { ...DEFAULT_STYLE.layers.buildings, show: true } } }
   const state = {
-    frame: DEFAULT_FRAME, style: DEFAULT_STYLE, detail: DEFAULT_DETAIL,
-    routes: [{ id: 'r1', name: 'Loop', color: '#ff0000', route: { points: [[1, 2], [3, 4]] as [number, number][], legs: [[[1, 2], [3, 4]]] as [number, number][][] } }],
+    frame: DEFAULT_FRAME, style: shown, detail: DEFAULT_DETAIL,
+    routes: [{ id: 'r1', name: 'Loop', color: '#ff0000', dashed: true, route: { points: [[1, 2], [3, 4]] as [number, number][], legs: [[[1, 2], [3, 4]]] as [number, number][][] } }],
     pins: [{ id: 'p1', at: [1, 2] as [number, number], label: 'Start' }],
     buildings: true, unit: 'mm' as const,
   }
   it('round-trips', () => {
     expect(parseProject(serializeProject(state))).toEqual(state)
+  })
+  it('opens files from before 0.2.0: buildings on if either old setting was, the old dashed setting kept', () => {
+    const route = { points: [[1, 2], [3, 4]], legs: [[[1, 2], [3, 4]]] }
+    const old = (buildings: boolean, show: boolean, dashed: boolean, routeDashed?: boolean) => parseProject(JSON.stringify({
+      schema: SCHEMA, version: 1, buildings,
+      style: { ...DEFAULT_STYLE, route: { ...DEFAULT_STYLE.route, dashed }, layers: { ...DEFAULT_STYLE.layers, buildings: { ...DEFAULT_STYLE.layers.buildings, show } } },
+      routes: [{ id: 'r1', name: 'A', color: '#ff0000', route, ...(routeDashed === undefined ? {} : { dashed: routeDashed }) }],
+    }))
+    // Downloaded with buildings but the layer hidden, the way every look left it: now one setting, on.
+    const a = old(true, false, false)
+    expect([a.buildings, a.style.layers.buildings.show]).toEqual([true, true])
+    const b = old(false, true, false)
+    expect([b.buildings, b.style.layers.buildings.show]).toEqual([true, true])
+    const c = old(false, false, false)
+    expect([c.buildings, c.style.layers.buildings.show]).toEqual([false, false])
+    // The Look tab's dashed switch reached only routes without their own setting.
+    expect(old(false, false, true).routes[0]!.dashed).toBe(true)
+    expect(old(false, false, true, false).routes[0]!.dashed).toBe(false)
+    expect(old(false, false, false).routes[0]!.dashed).toBe(false)
   })
   it('opens an old file with fewer settings, using defaults', () => {
     const old = JSON.stringify({ schema: SCHEMA, version: 1, frame: { centerLon: 1, centerLat: 2 } })

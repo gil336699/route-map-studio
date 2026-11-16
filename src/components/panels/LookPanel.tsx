@@ -11,13 +11,15 @@ interface Props {
   doc: Doc
   edit: (fn: (d: Doc) => Doc) => void
   onApplyLook: (look: Look) => void
+  /** Buildings on or off: the same setting as the Place tab's switch, which downloads them if needed. */
+  onBuildings: (on: boolean) => void
 }
 
 const AREAS: LayerId[] = ['parks', 'water', 'buildings']
 /** Which ink colour slot each ink role edits, by limit. */
 const SLOTS: Record<1 | 2 | 3, number[]> = { 1: [0], 2: [2, 1], 3: [0, 1, 2] }
 
-export function LookPanel({ doc, edit, onApplyLook }: Props) {
+export function LookPanel({ doc, edit, onApplyLook, onBuildings }: Props) {
   const s = doc.style
   const set = (patch: Partial<Style>) => edit((d) => ({ ...d, style: { ...d.style, ...patch } }))
   const setLayer = (id: LayerId, patch: Partial<Style['layers'][LayerId]>) =>
@@ -25,6 +27,8 @@ export function LookPanel({ doc, edit, onApplyLook }: Props) {
   const current = lookIdOf(s, LOOKS)
   const limited = s.inkLimit > 0
   const n = s.inkLimit as 1 | 2 | 3
+  // Each route has its own dashed setting (the - - button in the Route tab). This switch sets them all.
+  const allDashed = doc.routes.length > 0 && doc.routes.every((r) => r.dashed)
 
   return (
     <>
@@ -88,9 +92,16 @@ export function LookPanel({ doc, edit, onApplyLook }: Props) {
         {LAYER_ORDER.slice().reverse().map((id) => {
           const ls = s.layers[id]
           const area = AREAS.includes(id)
+          // An ink limit leaves parks out: they would need an ink of their own to read as parks.
+          const blocked = id === 'parks' && limited
+          const toggle = (on: boolean) => (id === 'buildings' ? onBuildings(on) : setLayer(id, { show: on }))
+          const help = blocked ? 'With an ink limit, parks are left out: they would need an ink of their own. Set the ink limit to Any to show them.'
+            : id === 'buildings' ? 'Show or hide building outlines. Turning them on downloads them if the map has none yet.'
+              : `Show or hide ${LAYER_NAMES[id].toLowerCase()}.`
           return (
             <div className="layer" key={id}>
-              <input type="checkbox" role="switch" className="switch" checked={ls.show} onChange={(e) => setLayer(id, { show: e.target.checked })} aria-label={`Show ${LAYER_NAMES[id]}`} {...tip(`Show or hide ${LAYER_NAMES[id].toLowerCase()}.`)} />
+              <input type="checkbox" role="switch" className="switch" checked={ls.show && !blocked} aria-disabled={blocked || undefined}
+                onChange={(e) => { if (!blocked) toggle(e.target.checked) }} aria-label={`Show ${LAYER_NAMES[id]}`} {...tip(help)} />
               <span className="layer-name">{LAYER_NAMES[id]}</span>
               {!limited ? <ColorField value={ls.color} onChange={(c) => setLayer(id, { color: c })} label={`${LAYER_NAMES[id]} colour`} /> : null}
               {area && id === 'water' ? (
@@ -112,7 +123,8 @@ export function LookPanel({ doc, edit, onApplyLook }: Props) {
         </Row>
         <Switch label="Knockout outline" checked={s.route.outline} onChange={(v) => set({ route: { ...s.route, outline: v } })}
           tip="A gap in the shirt colour around the route, so it lifts off the streets. Prints as no ink." />
-        <Switch label="Dashed" checked={s.route.dashed} onChange={(v) => set({ route: { ...s.route, dashed: v } })} tip="Draw the route as a dashed line." />
+        <Switch label={doc.routes.length > 1 ? 'Dash every route' : 'Dashed'} checked={allDashed} onChange={(v) => edit((d) => ({ ...d, routes: d.routes.map((r) => ({ ...r, dashed: v })) }))}
+          tip={doc.routes.length > 1 ? 'Draw every route as a dashed line. To dash just one, use its - - button in the Route tab.' : 'Draw the route as a dashed line.'} />
         <Switch label="Start and finish dots" checked={s.route.markers} onChange={(v) => set({ route: { ...s.route, markers: v } })} tip="A filled dot at the start and a ring at the finish. A loop gets the start dot only." />
         <Switch label="Distance markers" checked={s.distance.markers} onChange={(v) => set({ distance: { ...s.distance, markers: v } })} tip="A numbered marker along each route at a steady distance." />
         {s.distance.markers ? (

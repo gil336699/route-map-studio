@@ -3,9 +3,9 @@
 import { memoryCache, type MapCache } from '../lib/mapcache'
 import { fetchMap, type FetchOptions } from '../lib/overpass'
 import { printCheck } from '../lib/printcheck'
-import { buildGraph, type Graph } from '../map/graph'
+import { buildGraph, trial, type Graph } from '../map/graph'
 import type { ParsedMap } from '../map/osm'
-import { addPoint, closeLoop, emptyRoute } from '../map/route'
+import { addPoint, closeLoop, editRoute, emptyRoute } from '../map/route'
 import { buildScene, mapFrame } from '../map/scene'
 import { LAYER_ORDER, type BBox, type Feature, type LayerId } from '../map/types'
 import type { EngineRequest, EngineResponse } from './messages'
@@ -50,7 +50,7 @@ export function createEngine(fetcher: Fetcher = fetchMap, cache: MapCache = memo
           return {
             id: req.id, type: 'loaded', bbox: copy ? copy.bbox : req.bbox, places: map.places, counts: countLayers(features),
             droppedRings: map.droppedRings, nodes: graph.nodes.length, ms: performance.now() - t0,
-            ...(copy ? { cachedAt: copy.savedAt } : {}), mapId,
+            ...(copy ? { cachedAt: copy.savedAt } : {}), mapId, buildings: req.buildings,
           }
         }
         case 'cancel':
@@ -69,6 +69,13 @@ export function createEngine(fetcher: Fetcher = fetchMap, cache: MapCache = memo
         case 'close-loop': {
           const r = closeLoop(req.route, graphFor(req.follow))
           return { id: req.id, type: 'route', route: r.route, note: r.note }
+        }
+        case 'edit-route': {
+          // Edits follow the streets wherever a leg was drawn along them, whatever clicks do now.
+          const g = graph && graph.nodes.length ? graph : null
+          const run = () => editRoute(req.route, req.op, g)
+          const r = req.preview && g ? trial(g, run) : run()
+          return { id: req.id, type: 'route', route: r.route, note: r.note, index: r.index }
         }
         case 'route-from-points': {
           let r = emptyRoute()

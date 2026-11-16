@@ -1,7 +1,8 @@
 // Text: the club name, a subtitle, the distance (as a line or a huge number) and a key for the icons.
 import type { Doc } from '../../lib/doc'
-import { formatDistance } from '../../map/scene'
-import type { Pin, Style, TextStyle } from '../../map/types'
+import { ICONS, type BadgeIcon } from '../../map/icons'
+import { formatDistance, legendIcons, legendName } from '../../map/scene'
+import type { TextStyle } from '../../map/types'
 import { ColorField, Group, Row, Segmented, Switch, TextField } from '../Controls'
 
 interface Props {
@@ -10,17 +11,8 @@ interface Props {
   firstKm: number
 }
 
-type LegendKey = keyof Style['legendNames']
-const LEGEND_LABELS: Record<LegendKey, string> = { coffee: 'Coffee icon', museum: 'Museum icon', water: 'Water icon', star: 'Star icon', flag: 'Flag icon' }
-
-function usedIcons(pins: Pin[]): LegendKey[] {
-  const out: LegendKey[] = []
-  for (const p of pins) {
-    const i = p.icon ?? 'dot'
-    if (i !== 'dot' && i !== 'label' && !out.includes(i)) out.push(i)
-  }
-  return out
-}
+const LABEL = new Map(ICONS.map((i) => [i.id, `${i.label} icon`]))
+const iconLabel = (k: BadgeIcon) => LABEL.get(k) ?? 'Icon'
 
 export function TextPanel({ doc, edit, firstKm }: Props) {
   const t = doc.style.text
@@ -28,7 +20,7 @@ export function TextPanel({ doc, edit, firstKm }: Props) {
   const set = (patch: Partial<TextStyle>) => edit((d) => ({ ...d, style: { ...d.style, text: { ...d.style.text, ...patch } } }))
   const units = doc.style.distance.units
   const auto = firstKm > 0 ? (units === 'mi' ? firstKm / 1.609344 : firstKm).toFixed(1) : ''
-  const icons = usedIcons(doc.pins)
+  const icons = legendIcons(doc.pins)
 
   return (
     <>
@@ -54,8 +46,8 @@ export function TextPanel({ doc, edit, firstKm }: Props) {
         <Switch label="Show a key" checked={t.legend} onChange={(v) => set({ legend: v })} tip="A small key that names the pin icons, such as a cup for coffee stops." />
         {t.legend
           ? icons.map((k) => (
-              <Row key={k} label={LEGEND_LABELS[k]}>
-                <TextField value={doc.style.legendNames[k]} onChange={(v) => edit((d) => ({ ...d, style: { ...d.style, legendNames: { ...d.style.legendNames, [k]: v } } }))} label={`Name for the ${LEGEND_LABELS[k].toLowerCase()}`} tip="Printed in capitals in the key." />
+              <Row key={k} label={iconLabel(k)}>
+                <TextField value={legendName(doc.style, k)} onChange={(v) => edit((d) => ({ ...d, style: { ...d.style, legendNames: { ...d.style.legendNames, [k]: v } } }))} label={`Name for the ${iconLabel(k).toLowerCase()}`} tip="Printed in capitals in the key." />
               </Row>
             ))
           : null}

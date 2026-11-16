@@ -72,13 +72,25 @@ export function lookIdOf(style: Style, looks: Look[]): string {
 }
 
 /**
- * Apply a look: its colours, frame and layout. The user's own words, distance units and ink limit stay,
- * and routes are recoloured in order.
+ * Buildings on or off. One setting behind both switches (Place and Look): whether the map downloads
+ * buildings and whether the print shows them. Two settings that had to agree showed nothing when they
+ * did not, and every look turned the layer off.
+ */
+export function setBuildings(doc: Doc, on: boolean): Doc {
+  const layers = doc.style.layers
+  return { ...doc, buildings: on, style: { ...doc.style, layers: { ...layers, buildings: { ...layers.buildings, show: on } } } }
+}
+
+/**
+ * Apply a look: its colours, frame and layout. The user's own words, distance units, ink limit and
+ * buildings stay, and routes are recoloured in order.
  */
 export function applyLook(doc: Doc, look: Look): Doc {
   const mine = doc.style
+  const lookLayers = structuredClone(look.style.layers)
   const style: Style = {
     ...structuredClone(look.style),
+    layers: { ...lookLayers, buildings: { ...lookLayers.buildings, show: doc.buildings } },
     inkLimit: mine.inkLimit,
     legendNames: { ...mine.legendNames },
     distance: { ...look.style.distance, units: mine.distance.units },

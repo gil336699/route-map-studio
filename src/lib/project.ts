@@ -1,6 +1,7 @@
 // Project files: settings, routes and pins, with a schema name and version so old files keep opening.
 import { DEFAULT_DETAIL, DEFAULT_STYLE } from './presets'
-import { LAYER_ORDER, type Detail, type Frame, type LonLat, type Pin, type Route, type RouteItem, type Style } from '../map/types'
+import { ICONS } from '../map/icons'
+import { LAYER_ORDER, type Detail, type Frame, type LegKind, type LonLat, type Pin, type Route, type RouteItem, type Style } from '../map/types'
 import type { Unit } from './units'
 
 export const SCHEMA = 'route-map-studio.project'
@@ -26,10 +27,18 @@ const isPt = (v: unknown): v is LonLat => Array.isArray(v) && v.length === 2 && 
 const isLine = (v: unknown): v is LonLat[] => Array.isArray(v) && v.every(isPt)
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' ? (v as Record<string, unknown>) : {})
 
+const LEG_KINDS = ['roads', 'straight', 'track'] as const
+
 function readRoute(v: unknown): Route | null {
   const r = obj(v)
   if (!isLine(r.points) || !Array.isArray(r.legs) || !r.legs.every(isLine)) return null
-  return { points: r.points, legs: r.legs as LonLat[][] }
+  // Every leg joins two points, so a route whose counts disagree is damaged.
+  if (r.points.length > 0 && r.legs.length !== r.points.length - 1) return null
+  if (r.points.length === 0 && r.legs.length > 0) return null
+  const kinds = Array.isArray(r.kinds) && r.kinds.length === r.legs.length && r.kinds.every((k) => LEG_KINDS.includes(k as LegKind))
+    ? (r.kinds as LegKind[])
+    : undefined
+  return { points: r.points, legs: r.legs as LonLat[][], ...(kinds ? { kinds } : {}) }
 }
 
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean'
@@ -39,7 +48,7 @@ const str = (v: unknown, fallback: string, max = 200) => (isStr(v) ? v.slice(0, 
 const bool = (v: unknown, fallback: boolean) => (isBool(v) ? v : fallback)
 const clampNum = (v: unknown, lo: number, hi: number, fallback: number) => (isNum(v) ? Math.min(hi, Math.max(lo, v)) : fallback)
 const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(v as T) ? (v as T) : fallback)
-const PIN_ICON_IDS = ['dot', 'coffee', 'museum', 'water', 'star', 'flag', 'label'] as const
+const PIN_ICON_IDS: readonly string[] = ['dot', 'label', ...ICONS.map((i) => i.id)]
 
 /** Every style setting checked against its type and range, falling back to the default one by one. */
 function readStyle(v: unknown): Style {
@@ -75,7 +84,6 @@ function readStyle(v: unknown): Style {
       outline: bool(r.outline, d.route.outline),
       outlineColor: color(r.outlineColor, d.route.outlineColor),
       markers: bool(r.markers, d.route.markers),
-      dashed: bool(r.dashed, d.route.dashed),
     },
     distance: {
       units: oneOf(di.units, ['km', 'mi'] as const, d.distance.units),
@@ -83,13 +91,8 @@ function readStyle(v: unknown): Style {
       every: clampNum(di.every, 0.1, 50, d.distance.every),
     },
     pinColor: color(s.pinColor, d.pinColor),
-    legendNames: {
-      coffee: str(ln.coffee, d.legendNames.coffee, 60),
-      museum: str(ln.museum, d.legendNames.museum, 60),
-      water: str(ln.water, d.legendNames.water, 60),
-      star: str(ln.star, d.legendNames.star, 60),
-      flag: str(ln.flag, d.legendNames.flag, 60),
-    },
+    // Only the names the user typed are kept; the rest come from each icon.
+    legendNames: Object.fromEntries(ICONS.filter((i) => isStr(ln[i.id])).map((i) => [i.id, (ln[i.id] as string).slice(0, 60)])),
     text: {
       show: bool(t.show, d.text.show),
       title: str(t.title, d.text.title),
@@ -130,6 +133,12 @@ export function parseProject(text: string): ProjectState {
     heightMm: clampNum(f.heightMm, 25, 1500, 355.6),
   }
   const style = readStyle(raw.style)
+  // Before 0.2.0 buildings had two settings, which had to agree for any to show: what to download, and
+  // whether the layer was shown. Either one on means the user wanted them.
+  const buildings = raw.buildings === true || style.layers.buildings.show
+  style.layers.buildings = { ...style.layers.buildings, show: buildings }
+  // Before 0.2.0 the Look tab had a dashed setting for routes without one of their own.
+  const allDashed = obj(obj(raw.style).route).dashed === true
   const dd = obj(raw.detail)
   const detail: Detail = {
     simplifyMm: clampNum(dd.simplifyMm, 0, 5, DEFAULT_DETAIL.simplifyMm),
@@ -147,7 +156,7 @@ export function parseProject(text: string): ProjectState {
         name: str(o.name, `Route ${i + 1}`, 80),
         color: color(o.color, '#e4572e'),
         route,
-        ...(isBool(o.dashed) ? { dashed: o.dashed } : {}),
+        dashed: isBool(o.dashed) ? o.dashed : allDashed,
       })
     })
   }
@@ -156,10 +165,10 @@ export function parseProject(text: string): ProjectState {
     raw.pins.forEach((item, i) => {
       const o = obj(item)
       if (!isPt(o.at)) return
-      const icon = PIN_ICON_IDS.includes(o.icon as (typeof PIN_ICON_IDS)[number]) ? (o.icon as Pin['icon']) : undefined
+      const icon = isStr(o.icon) && PIN_ICON_IDS.includes(o.icon) ? (o.icon as Pin['icon']) : undefined
       pins.push({ id: isStr(o.id) ? o.id : `p${i + 1}`, at: o.at, label: str(o.label, '', 80), ...(icon ? { icon } : {}) })
     })
   }
   const unit = raw.unit === 'mm' || raw.unit === 'in' || raw.unit === 'pt' || raw.unit === 'px' ? raw.unit : 'in'
-  return { frame, style, detail, routes, pins, buildings: raw.buildings === true, unit }
+  return { frame, style, detail, routes, pins, buildings, unit }
 }

@@ -13,7 +13,8 @@ import { Tabs } from './components/Tabs'
 import { TooltipLayer } from './components/Tooltip'
 import { TopBar } from './components/TopBar'
 import { Viewport, type Tool } from './components/Viewport'
-import { applyLook, downloadBox, fitFrame, isCovered, lookIdOf, newDoc, nextRoute, uid, type Doc } from './lib/doc'
+import { applyLook, downloadBox, fitFrame, isCovered, lookIdOf, newDoc, nextRoute, setBuildings, uid, type Doc } from './lib/doc'
+import { emptyHistory, record, stepBack, stepForward, type Change, type History } from './lib/history'
 import { openFile, saveFile, svgToPng } from './lib/files'
 import type { PlaceResult } from './lib/nominatim'
 import { LOOKS, type Look } from './lib/presets'
@@ -21,8 +22,9 @@ import { parseProject, serializeProject } from './lib/project'
 import { useEngine } from './lib/useEngine'
 import { waitingCard } from './lib/waiting'
 import { PLACE_ICON } from './map/places'
-import { emptyRoute, routeFromTrack, undoPoint } from './map/route'
+import { emptyRoute, routeFromTrack, type RouteEdit } from './map/route'
 import { parseRouteFile } from './map/routefile'
+import { makeProjection } from './map/geo'
 import { mapFrame } from './map/scene'
 import type { LonLat, Pin, Place, Route, RouteItem } from './map/types'
 import type { EngineResponse } from './worker/messages'
@@ -59,18 +61,34 @@ function seenQuickStart(): boolean {
 
 export default function App() {
   const call = useEngine()
-  const [doc, setDoc] = useState<Doc>(newDoc)
+  const [doc, setDocState] = useState<Doc>(newDoc)
   const [version, setVersion] = useState(0)
   const [savedVersion, setSavedVersion] = useState(0)
   const dirty = version !== savedVersion
-  const edit = useCallback((fn: (d: Doc) => Doc) => {
-    setDoc(fn)
-    setVersion((v) => v + 1)
-  }, [])
+  // The newest document, updated the moment an edit is made rather than on the next render, so edits
+  // that run one after another (fast clicks, undo) each start from the one before.
   const docRef = useRef(doc)
-  useEffect(() => {
-    docRef.current = doc
-  })
+  const setDoc = useCallback((next: Doc) => {
+    docRef.current = next
+    setDocState(next)
+  }, [])
+  const edit = useCallback((fn: (d: Doc) => Doc) => {
+    setDoc(fn(docRef.current))
+    setVersion((v) => v + 1)
+  }, [setDoc])
+
+  // Undo and redo for routes and pins. The ref is the truth; the state is for the buttons.
+  const historyRef = useRef<History>(emptyHistory())
+  const [history, setHistoryState] = useState<History>(emptyHistory)
+  const setHistory = useCallback((h: History) => {
+    historyRef.current = h
+    setHistoryState(h)
+  }, [])
+  /** Make a change that undo can take back. */
+  const change = useCallback((c: Change, fn: (d: Doc) => Doc) => {
+    edit(fn)
+    setHistory(record(historyRef.current, c))
+  }, [edit, setHistory])
 
   const [tab, setTab] = useState<Tab>('place')
   const [tool, setToolState] = useState<Tool>('move')
@@ -117,6 +135,9 @@ export default function App() {
   const loadingSeconds = loadingSince === null ? null : Math.max(0, Math.round((now - loadingSince) / 1000))
 
   const selected = doc.routes.find((r) => r.id === selectedId) ?? doc.routes[0]
+  // The point picked on the map for removing, in the Draw tool.
+  const [picked, setPicked] = useState<{ id: string; index: number } | null>(null)
+  const pickedIndex = tool === 'draw' && picked && selected && picked.id === selected.id && picked.index < selected.route.points.length ? picked.index : null
   const setTool = useCallback((t: Tool) => {
     setToolState(t)
     setView('print')
@@ -159,9 +180,9 @@ export default function App() {
     })()
   }, [sceneReq, loaded, call, say, release])
 
-  // Downloading. A newer download replaces an older one.
+  // Downloading. A newer download replaces an older one: the older one ends 'replaced'.
   const loadSeq = useRef(0)
-  const download = useCallback(async (d: Doc, fresh = false): Promise<boolean> => {
+  const download = useCallback(async (d: Doc, fresh = false): Promise<'ok' | 'failed' | 'stopped' | 'replaced'> => {
     const seq = ++loadSeq.current
     setLoadingSince(Date.now())
     setNow(Date.now())
@@ -169,23 +190,38 @@ export default function App() {
     const res = await call({ type: 'load', bbox: downloadBox(d.frame, d.style), buildings: d.buildings, fresh }, (text) => {
       if (seq === loadSeq.current) setLoadingText(text)
     })
-    if (seq !== loadSeq.current) return false
+    if (seq !== loadSeq.current) return 'replaced'
     setLoadingSince(null)
     if (res.type === 'loaded') {
       setLoaded(res)
       const lines = res.counts.minor + res.counts.major + res.counts.paths
+      const houses = res.buildings ? `${res.counts.buildings.toLocaleString()} buildings, ` : ''
       if (res.cachedAt) {
         const days = Math.floor((Date.now() - res.cachedAt) / 86_400_000)
         say(`Map opened from this browser’s copy, saved ${days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`}. For the newest data, press Download again in the Place tab.`)
       } else {
-        say(`Map downloaded in ${(res.ms / 1000).toFixed(1)} s: ${lines.toLocaleString()} streets and paths, ${res.places.length} landmarks.`)
+        say(`Map downloaded in ${(res.ms / 1000).toFixed(1)} s: ${lines.toLocaleString()} streets and paths, ${houses}${res.places.length} landmarks.`)
       }
-      return true
+      return 'ok'
     }
     if (res.type === 'error') say(res.message, 'warn')
     if (res.type === 'cancelled') say('Download stopped. The map you had is still here.')
-    return false
+    return res.type === 'cancelled' ? 'stopped' : 'failed'
   }, [call, say])
+
+  // Buildings on: when the map in view came without them, download it again with them. If that download
+  // fails or is stopped, buildings go back off, so the switch never shows on over a map without them.
+  const onBuildings = (on: boolean) => {
+    const next = setBuildings(docRef.current, on)
+    edit((d) => setBuildings(d, on))
+    const map = loadedRef.current
+    if (!on || !map || map.buildings) return
+    void download(next).then((r) => {
+      if (r !== 'failed' && r !== 'stopped') return
+      edit((d) => setBuildings(d, false))
+      setStatus((st) => (st ? { ...st, text: `${st.text} Buildings are off again.` } : st))
+    })
+  }
   const cancelDownload = useCallback(() => {
     void call({ type: 'cancel' })
   }, [call])
@@ -193,20 +229,50 @@ export default function App() {
   // Route edits run one after another, each on the result of the one before, so fast clicks never
   // lose a point.
   const chain = useRef<Promise<void>>(Promise.resolve())
-  const latestRoute = useRef(new Map<string, Route>())
   const queue = useCallback((op: () => Promise<void>) => {
     chain.current = chain.current.then(op).catch(() => undefined)
   }, [])
-  const routeOf = (id: string): Route => latestRoute.current.get(id) ?? docRef.current.routes.find((r) => r.id === id)?.route ?? emptyRoute()
-  const setRoute = useCallback((id: string, route: Route) => {
-    latestRoute.current.set(id, route)
-    edit((d) => ({ ...d, routes: d.routes.map((r) => (r.id === id ? { ...r, route } : r)) }))
-  }, [edit])
+  const routeOf = (id: string): Route => docRef.current.routes.find((r) => r.id === id)?.route ?? emptyRoute()
+  /** A new shape for a route, which undo can take back. `what` names it: "Undid adding a point." */
+  const setRoute = useCallback((id: string, route: Route, what: string) => {
+    const before = docRef.current.routes.find((r) => r.id === id)?.route
+    if (!before || before === route) return
+    change({ kind: 'route', id, before, after: route, what }, (d) => ({ ...d, routes: d.routes.map((r) => (r.id === id ? { ...r, route } : r)) }))
+  }, [change])
+
+  /** Remove, move or insert a point of a route, then say anything the user should know. */
+  const editPoint = useCallback((id: string, op: RouteEdit, what: string, then?: (index?: number) => void) => {
+    queue(async () => {
+      const res = await call({ type: 'edit-route', route: routeOf(id), op })
+      if (res.type === 'route') {
+        setRoute(id, res.route, what)
+        if (res.note) say(res.note, 'warn')
+        then?.(res.index)
+      } else if (res.type === 'error') say(res.message, 'warn')
+    })
+  // routeOf reads the ref, so it needs no dependency.
+  }, [queue, call, setRoute, say])
+
+  const undo = () => queue(async () => {
+    const back = stepBack(docRef.current, historyRef.current)
+    if (!back) return say('Nothing to undo.')
+    edit(() => back.doc)
+    setHistory(back.history)
+    say(`Undid ${back.change.what}.`)
+  })
+  const redo = () => queue(async () => {
+    const again = stepForward(docRef.current, historyRef.current)
+    if (!again) return say('Nothing to redo.')
+    edit(() => again.doc)
+    setHistory(again.history)
+    say(`Redid ${again.change.what}.`)
+  })
 
   const onPick = (p: LonLat) => {
     if (tool === 'pin') {
       const pin: Pin = { id: uid('p'), at: p, label: '', icon: 'star' }
-      edit((d) => ({ ...d, pins: [...d.pins, pin] }))
+      const index = docRef.current.pins.length
+      change({ kind: 'pin', id: pin.id, before: null, after: pin, index, what: 'dropping a pin' }, (d) => ({ ...d, pins: [...d.pins, pin] }))
       setTab('route')
       requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(`pin-label-${pin.id}`)?.focus()))
       say('Pin dropped. Type its label and pick its icon in the Route tab.')
@@ -219,10 +285,47 @@ export default function App() {
     queue(async () => {
       const res = await call({ type: 'add-point', route: routeOf(id), p, follow: roads })
       if (res.type === 'route') {
-        setRoute(id, res.route)
+        setRoute(id, res.route, 'adding a point')
         if (res.note) say(res.note, 'warn')
       } else if (res.type === 'error') say(res.message, 'warn')
     })
+  }
+
+  // Editing the selected route on the map.
+  const editWhat: Record<RouteEdit['kind'], string> = { move: 'moving a point', insert: 'the detour', split: 'adding a point on the line', remove: 'removing a point' }
+  // A new point is not picked: its handle is there to drag, and a bubble after every detour would only
+  // need closing before the next click could add a point.
+  const onEditRoute = (op: RouteEdit) => {
+    const id = selected?.id
+    if (id) editPoint(id, op, editWhat[op.kind])
+  }
+  const onPreviewEdit = async (op: RouteEdit): Promise<Route | null> => {
+    const id = selected?.id
+    if (!id) return null
+    const res = await call({ type: 'edit-route', route: routeOf(id), op, preview: true })
+    return res.type === 'route' ? res.route : null
+  }
+  const removePicked = (i: number) => {
+    const id = selected?.id
+    if (!id) return
+    setPicked(null)
+    editPoint(id, { kind: 'remove', index: i, mode: follow && !!loaded ? 'roads' : 'straight' }, 'removing a point')
+  }
+  /** Pick the next or previous point, for editing by keyboard. The map follows to a point out of view. */
+  const stepPoint = (by: 1 | -1) => {
+    const r = selected?.route
+    if (!r || !r.points.length || !selected) return
+    const n = r.points.length
+    const at = pickedIndex === null ? (by > 0 ? 0 : n - 1) : (pickedIndex + by + n) % n
+    setPicked({ id: selected.id, index: at })
+    const p = r.points[at] as LonLat
+    const d = docRef.current
+    const m = mapFrame(d.frame, d.style)
+    const [x, y] = makeProjection(m).toMm(p)
+    const edge = Math.min(m.widthMm, m.heightMm) * 0.12
+    if (x < edge || x > m.widthMm - edge || y < edge || y > m.heightMm - edge) {
+      edit((x0) => ({ ...x0, frame: { ...x0.frame, centerLon: p[0], centerLat: p[1] } }))
+    }
   }
 
   const onView = (next: { centerLon: number; centerLat: number; widthKm: number }) => {
@@ -235,14 +338,6 @@ export default function App() {
     edit((d) => ({ ...d, frame: { ...d.frame, centerLon: f.centerLon, centerLat: f.centerLat, widthKm: f.widthKm } }))
   }
 
-  const undo = () => {
-    const id = selected?.id
-    if (!id) return
-    queue(async () => {
-      const r = routeOf(id)
-      if (r.points.length) setRoute(id, undoPoint(r))
-    })
-  }
 
   const importRoute = async () => {
     const file = await openFile('.gpx,.geojson,.json,application/gpx+xml,application/geo+json')
@@ -269,12 +364,15 @@ export default function App() {
         id = r.id
         routes = [...d.routes, { ...r, name: name || r.name, route }]
       }
-      latestRoute.current.set(id, route)
       // Fit the page to every route, the new one included.
       const f = fitFrame(d.frame, d.style, routes)
       const frame = f ? { ...d.frame, centerLon: f.centerLon, centerLat: f.centerLat, widthKm: f.widthKm } : d.frame
       const added = routes.find((r) => r.id === id) as RouteItem
-      edit((x) => ({
+      const what = `importing ${file.name}`
+      const c: Change = target
+        ? { kind: 'route', id, before: routeOf(id), after: route, what }
+        : { kind: 'add-route', item: added, index: d.routes.length, what }
+      change(c, (x) => ({
         ...x,
         frame,
         routes: x.routes.some((r) => r.id === id) ? x.routes.map((r) => (r.id === id ? { ...r, route } : r)) : [...x.routes, added],
@@ -289,7 +387,7 @@ export default function App() {
     addRoute: () => {
       const d = docRef.current
       const r = nextRoute(d, lookIdOf(d.style, LOOKS) || 'vintage')
-      edit((x) => ({ ...x, routes: [...x.routes, r] }))
+      change({ kind: 'add-route', item: r, index: d.routes.length, what: `adding ${r.name}` }, (x) => ({ ...x, routes: [...x.routes, r] }))
       setSelectedId(r.id)
       setTool('draw')
       say(`${r.name} added. Click the map to draw it.`)
@@ -298,8 +396,10 @@ export default function App() {
       const r = docRef.current.routes.find((x) => x.id === id)
       if (!r || docRef.current.routes.length < 2) return
       const go = () => {
-        latestRoute.current.delete(id)
-        edit((d) => ({ ...d, routes: d.routes.filter((x) => x.id !== id) }))
+        const now = docRef.current.routes
+        const item = now.find((x) => x.id === id)
+        if (!item) return
+        change({ kind: 'delete-route', item, index: now.indexOf(item), what: `deleting ${item.name || 'the route'}` }, (d) => ({ ...d, routes: d.routes.filter((x) => x.id !== id) }))
       }
       if (!routeOf(id).points.length) return go()
       setConfirm({ title: `Delete ${r.name}?`, body: `Its ${routeOf(id).points.length} points will be lost.`, confirm: 'Delete', danger: true, onConfirm: go })
@@ -308,13 +408,14 @@ export default function App() {
     recolorRoute: (id, color) => edit((d) => ({ ...d, routes: d.routes.map((r) => (r.id === id ? { ...r, color } : r)) })),
     setDashed: (id, dashed) => edit((d) => ({ ...d, routes: d.routes.map((r) => (r.id === id ? { ...r, dashed } : r)) })),
     undo,
+    redo,
     closeLoop: () => {
       const id = selected?.id
       if (!id) return
       queue(async () => {
         const res = await call({ type: 'close-loop', route: routeOf(id), follow: follow && !!loaded })
         if (res.type === 'route') {
-          setRoute(id, res.route)
+          setRoute(id, res.route, 'closing the loop')
           if (res.note) say(res.note, 'warn')
         }
       })
@@ -324,18 +425,37 @@ export default function App() {
       if (!id) return
       setConfirm({
         title: `Clear ${selected.name}?`, body: `All ${routeOf(id).points.length} points of this route will be removed.`, confirm: 'Clear', danger: true,
-        onConfirm: () => queue(async () => setRoute(id, emptyRoute())),
+        onConfirm: () => queue(async () => setRoute(id, emptyRoute(), `clearing ${selected.name || 'the route'}`)),
       })
     },
     importRoute: () => void importRoute(),
     fit,
     togglePlace: (p: Place) => {
-      edit((d) => d.pins.some((x) => x.id === p.id)
-        ? { ...d, pins: d.pins.filter((x) => x.id !== p.id) }
-        : { ...d, pins: [...d.pins, { id: p.id, at: p.at, label: p.name, icon: PLACE_ICON[p.kind] }] })
+      const pins = docRef.current.pins
+      const had = pins.find((x) => x.id === p.id)
+      if (had) {
+        change({ kind: 'pin', id: p.id, before: had, after: null, index: pins.indexOf(had), what: `removing ${p.name}` }, (d) => ({ ...d, pins: d.pins.filter((x) => x.id !== p.id) }))
+      } else {
+        const pin: Pin = { id: p.id, at: p.at, label: p.name, icon: PLACE_ICON[p.kind] }
+        change({ kind: 'pin', id: p.id, before: null, after: pin, index: pins.length, what: `adding ${p.name}` }, (d) => ({ ...d, pins: [...d.pins, pin] }))
+      }
     },
-    updatePin: (id, patch) => edit((d) => ({ ...d, pins: d.pins.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
-    deletePin: (id) => edit((d) => ({ ...d, pins: d.pins.filter((p) => p.id !== id) })),
+    updatePin: (id, patch) => {
+      const pins = docRef.current.pins
+      const was = pins.find((p) => p.id === id)
+      if (!was) return
+      const now = { ...was, ...patch }
+      const apply = (d: Doc) => ({ ...d, pins: d.pins.map((p) => (p.id === id ? { ...p, ...patch } : p)) })
+      // A new icon can be undone; typing a label is undone in the text field itself.
+      if (patch.icon !== undefined && patch.icon !== was.icon) change({ kind: 'pin', id, before: was, after: now, index: pins.indexOf(was), what: `the icon of ${was.label || 'a pin'}` }, apply)
+      else edit(apply)
+    },
+    deletePin: (id) => {
+      const pins = docRef.current.pins
+      const was = pins.find((p) => p.id === id)
+      if (!was) return
+      change({ kind: 'pin', id, before: was, after: null, index: pins.indexOf(was), what: `removing ${was.label || 'a pin'}` }, (d) => ({ ...d, pins: d.pins.filter((p) => p.id !== id) }))
+    },
   }
 
   const onApplyLook = (look: Look) => {
@@ -403,7 +523,7 @@ export default function App() {
       const state = parseProject(await file.text())
       if (!state.routes.length) state.routes = [nextRoute(state, lookIdOf(state.style, LOOKS) || 'vintage')]
       release()
-      latestRoute.current.clear()
+      setHistory(emptyHistory())
       setDoc(state)
       setVersion((v) => {
         setSavedVersion(v + 1)
@@ -424,15 +544,14 @@ export default function App() {
   const runExample = async () => {
     release()
     const fresh = newDoc()
-    latestRoute.current.clear()
+    setHistory(emptyHistory())
     setDoc(fresh)
     setVersion((v) => {
       setSavedVersion(v + 1)
       return v + 1
     })
     setSelectedId(fresh.routes[0]?.id ?? '')
-    const ok = await download(fresh)
-    if (!ok) return
+    if ((await download(fresh)) !== 'ok') return
     const id = fresh.routes[0]?.id
     if (!id) return
     holdFor.current = id
@@ -443,7 +562,6 @@ export default function App() {
       if (res.type === 'error') say(`The example route could not be drawn: ${res.message}`, 'warn')
       return
     }
-    setRoute(id, res.route)
     edit((x) => {
       const routes = x.routes.map((r) => (r.id === id ? { ...r, name: 'Banks loop', route: res.route } : r))
       const f = fitFrame(x.frame, x.style, routes)
@@ -484,9 +602,10 @@ export default function App() {
   }
 
   // Keyboard shortcuts. The handlers change every render, so the listener reads them from a ref.
-  const keys = useRef({ undo, fit, saveProject, openProject, exportSvg, setTool })
+  const letGoPoint = () => setPicked(null)
+  const keys = useRef({ undo, redo, fit, saveProject, openProject, exportSvg, setTool, pickedIndex, removePicked, stepPoint, letGoPoint })
   useEffect(() => {
-    keys.current = { undo, fit, saveProject, openProject, exportSvg, setTool }
+    keys.current = { undo, redo, fit, saveProject, openProject, exportSvg, setTool, pickedIndex, removePicked, stepPoint, letGoPoint }
   })
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -501,7 +620,13 @@ export default function App() {
       if (mod && k === 'e') { e.preventDefault(); void h.exportSvg(); return }
       if (typing) return
       if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); h.undo(); return }
+      if ((mod && k === 'z' && e.shiftKey) || (e.ctrlKey && k === 'y')) { e.preventDefault(); h.redo(); return }
       if (mod || e.altKey) return
+      // A picked point: Delete removes it, Esc lets it go.
+      if (h.pickedIndex !== null && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); h.removePicked(h.pickedIndex); return }
+      if (h.pickedIndex !== null && e.key === 'Escape') { h.letGoPoint(); return }
+      if (e.key === ']') { h.stepPoint(1); return }
+      if (e.key === '[') { h.stepPoint(-1); return }
       if (k === 'd') h.setTool('draw')
       else if (k === 'p') h.setTool('pin')
       else if (k === 'm' || e.key === 'Escape') h.setTool('move')
@@ -543,7 +668,12 @@ export default function App() {
         picMap={shownMap}
         viewMap={viewMap}
         tool={tool}
-        points={selected?.route.points ?? []}
+        route={selected?.route ?? null}
+        selectedPoint={pickedIndex}
+        onSelectPoint={(i) => setPicked(i === null || !selected ? null : { id: selected.id, index: i })}
+        onEdit={onEditRoute}
+        onPreview={onPreviewEdit}
+        onRemovePoint={removePicked}
         paper={paper}
         busy={waiting}
         empty={!loaded && !hasPoints}
@@ -561,13 +691,14 @@ export default function App() {
         {/* Keyed by tab, so each tab opens at its top instead of as far down as the last tab was scrolled. */}
         <div key={tab} className="panel-body" role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
           {tab === 'place' ? (
-            <PlacePanel doc={doc} edit={edit} covered={covered} loading={loadingSince !== null} onDownload={() => void download(docRef.current, !!loaded)} onPickPlace={onPickPlace}
+            <PlacePanel doc={doc} edit={edit} covered={covered} loading={loadingSince !== null} onDownload={() => void download(docRef.current, !!loaded)} onPickPlace={onPickPlace} onBuildings={onBuildings}
               loaded={loaded ? { counts: loaded.counts, places: loaded.places.length, ms: loaded.ms } : null} />
           ) : tab === 'route' ? (
             <RoutePanel doc={doc} selectedId={selected?.id ?? ''} onSelect={setSelectedId} follow={follow} setFollow={setFollow} hasMap={!!loaded}
-              routeKm={scene?.stats.routeKm ?? []} places={loaded?.places ?? []} ops={ops} />
+              routeKm={scene?.stats.routeKm ?? []} places={loaded?.places ?? []} ops={ops}
+              undoWhat={history.undo[history.undo.length - 1]?.what ?? null} redoWhat={history.redo[history.redo.length - 1]?.what ?? null} />
           ) : tab === 'look' ? (
-            <LookPanel doc={doc} edit={edit} onApplyLook={onApplyLook} />
+            <LookPanel doc={doc} edit={edit} onApplyLook={onApplyLook} onBuildings={onBuildings} />
           ) : tab === 'text' ? (
             <TextPanel doc={doc} edit={edit} firstKm={(scene?.stats.routeKm ?? []).find((k) => k > 0) ?? 0} />
           ) : (

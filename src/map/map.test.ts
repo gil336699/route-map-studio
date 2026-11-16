@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { bboxContains, haversineKm, makeProjection, pathLengthKm } from './geo'
 import { buildGraph, nearestNode, shortestPath } from './graph'
+import { ICONS } from './icons'
 import { classify, parseOverpass, placeKind, stitchRings } from './osm'
 import { distanceToLineM, placesNear } from './places'
 import { buildQuery } from '../lib/overpass'
@@ -369,11 +370,13 @@ describe('scene', () => {
     expect(svg).toContain('>ROCKY STEPS</text>')
     expect(svg).not.toContain('FAR')
   })
-  it('dashes the route on request, for all routes or just one', () => {
-    expect(buildScene(withStyle({ route: { ...noText.route, dashed: true } })).svg).toContain('stroke-dasharray')
+  it('dashes each route set to dashed, and only those', () => {
     expect(buildScene(base).svg).not.toContain('stroke-dasharray')
-    const one = buildScene({ ...base, routes: [{ ...routes[0]!, dashed: true }] }).svg
-    expect(one.slice(one.indexOf('id="route-1-line"'))).toMatch(/^id="route-1-line"[^>]*stroke-dasharray/)
+    const two = buildScene({ ...base, routes: [{ ...routes[0]!, dashed: true }, { ...routes[0]!, id: 'r2', name: 'Out', dashed: false }] }).svg
+    const line = (n: number) => (two.match(new RegExp(`<path id="route-${n}-line"[^>]*>`)) ?? [''])[0]
+    expect(line(1)).toContain('stroke-dasharray')
+    expect(line(2)).not.toContain('stroke-dasharray')
+    expect(line(2)).toContain('stroke=')
   })
 })
 
@@ -385,6 +388,43 @@ describe('landmarks', () => {
     expect(placeKind({ amenity: 'drinking_water' })).toBe('water')
     expect(placeKind({ tourism: 'viewpoint' })).toBe('sight')
     expect(placeKind({ amenity: 'bank' })).toBeNull()
+  })
+  it('knows the new kinds: bakeries, ice cream, bars and breweries, restaurants, monuments, parks and more', () => {
+    expect(placeKind({ shop: 'bakery' })).toBe('bakery')
+    expect(placeKind({ shop: 'pastry' })).toBe('bakery')
+    expect(placeKind({ amenity: 'ice_cream' })).toBe('icecream')
+    expect(placeKind({ amenity: 'pub' })).toBe('bar')
+    expect(placeKind({ craft: 'brewery' })).toBe('bar')
+    expect(placeKind({ amenity: 'restaurant' })).toBe('food')
+    expect(placeKind({ historic: 'memorial' })).toBe('monument')
+    // A plaque on a wall is not a landmark anyone runs to.
+    expect(placeKind({ historic: 'memorial', memorial: 'plaque' })).toBeNull()
+    expect(placeKind({ leisure: 'stadium' })).toBe('stadium')
+    expect(placeKind({ leisure: 'park' })).toBe('park')
+    expect(placeKind({ man_made: 'bridge' })).toBe('bridge')
+    expect(placeKind({ railway: 'station' })).toBe('station')
+    expect(placeKind({ amenity: 'toilets' })).toBe('toilets')
+    // A café inside a museum is a café: the first match wins.
+    expect(placeKind({ amenity: 'cafe', tourism: 'museum' })).toBe('coffee')
+  })
+  it('leaves out parks and bridges with no name, but keeps restrooms and water, which rarely have one', () => {
+    const out = parseOverpass({
+      elements: [
+        { type: 'way', id: 1, center: { lat: 39.96, lon: -75.18 }, tags: { leisure: 'park' } },
+        { type: 'way', id: 2, center: { lat: 39.96, lon: -75.18 }, tags: { man_made: 'bridge' } },
+        { type: 'way', id: 3, center: { lat: 39.96, lon: -75.18 }, tags: { man_made: 'bridge', name: 'Walnut Street Bridge' } },
+        { type: 'node', id: 4, lat: 39.97, lon: -75.19, tags: { amenity: 'toilets' } },
+        { type: 'node', id: 5, lat: 39.97, lon: -75.19, tags: { railway: 'station' } },
+      ],
+    })
+    expect(out.places.map((p) => [p.kind, p.name])).toEqual([['bridge', 'Walnut Street Bridge'], ['toilets', 'Restrooms']])
+  })
+  it('asks OpenStreetMap for every kind, named where a name is what makes it a landmark', () => {
+    const q = buildQuery({ west: 0, south: 0, east: 1, north: 1 }, false)
+    for (const want of ['toilets', 'restaurant', 'ice_cream', 'biergarten', 'bakery', 'pastry', '"craft"="brewery"', 'monument|memorial', '["memorial"!="plaque"]', 'park|stadium', '"man_made"="bridge"', 'station|halt']) {
+      expect(q, want).toContain(want)
+    }
+    expect(q).toMatch(/"man_made"="bridge"\]\["name"\]/)
   })
   it('reads places from points, centres and outlines, once each', () => {
     const out = parseOverpass({
@@ -429,23 +469,41 @@ describe('pin icons', () => {
     const svg = scene([{ id: 'p', at: proj.toLonLat(50, 50), label: 'Rocky Brew', icon: 'coffee' }])
     const pin = svg.slice(svg.indexOf('id="pins"'))
     expect(pin).toContain(`fill="${DEFAULT_STYLE.shirt}"`)
-    expect((pin.match(/<path /g) ?? []).length).toBe(2)
+    // One shape per icon, filled in the knockout colour.
+    expect((pin.match(/<path /g) ?? []).length).toBe(1)
     expect((pin.match(/>ROCKY BREW<\/text>/g) ?? []).length).toBe(2)
     expect(pin).toMatch(/fill="none" stroke="#f2ede1" stroke-width="[0-9.]+" stroke-linejoin="round">ROCKY BREW/)
   })
-  it('keeps every icon path inside its badge', () => {
-    for (const icon of ['coffee', 'museum', 'water', 'star', 'flag'] as const) {
+  it('keeps every icon inside its badge', () => {
+    for (const { id: icon } of ICONS) {
       const svg = scene([{ id: 'p', at: proj.toLonLat(100, 100), label: '', icon }])
+      const pins = svg.slice(svg.indexOf('id="pins"'))
+      const r = Number(/<circle cx="100" cy="100" r="([0-9.]+)"/.exec(pins)?.[1])
       // Every end point and control point, leaving out arc radii and flags.
-      const nums = [...svg.slice(svg.indexOf('id="pins"')).matchAll(/<path d="([^"]+)"/g)].flatMap((m) =>
+      const nums = [...pins.matchAll(/<path d="([^"]+)"/g)].flatMap((m) =>
         [...(m[1] as string).matchAll(/([A-Z])([^A-Z]*)/g)].flatMap(([, cmd, args]) => {
-          const n = (args as string).trim() ? (args as string).trim().split(/\s+/).map(Number) : []
+          const n = ((args as string).match(/-?(?:\d+\.?\d*|\.\d+)/g) ?? []).map(Number)
           return cmd === 'A' ? n.slice(5) : n
         }),
       )
       expect(nums.length, icon).toBeGreaterThan(0)
-      for (const n of nums) expect(Math.abs(n - 100), icon).toBeLessThan(5)
+      expect(r, icon).toBeGreaterThan(1)
+      // Curve handles may reach a little past the shape, but never past the badge's edge.
+      for (const n of nums) expect(Math.abs(n - 100), icon).toBeLessThan(r * 0.7)
     }
+  })
+  it('names each icon in the key, with the name the user typed where there is one', () => {
+    const keyed: Style = { ...DEFAULT_STYLE, text: { ...DEFAULT_STYLE.text, show: true, legend: true }, legendNames: { coffee: 'Our coffee stops' } }
+    const pins: Pin[] = [
+      { id: 'a', at: proj.toLonLat(60, 60), label: '30th Street', icon: 'train' },
+      { id: 'b', at: proj.toLonLat(90, 90), label: 'Corner Café', icon: 'coffee' },
+      { id: 'c', at: proj.toLonLat(120, 120), label: 'Office', icon: 'office' },
+    ]
+    const svg = buildScene({ features: [], routes: [], pins, frame: f, style: keyed, detail: DEFAULT_DETAIL }).svg
+    const key = svg.slice(svg.indexOf('id="legend"'))
+    expect(key).toContain('>STATIONS</text>')
+    expect(key).toContain('>OUR COFFEE STOPS</text>')
+    expect(key).toContain('>OFFICES</text>')
   })
   it('puts a label left of a pin near the right edge', () => {
     const svg = scene([{ id: 'p', at: proj.toLonLat(195, 100), label: 'Boathouse Row', icon: 'star' }])

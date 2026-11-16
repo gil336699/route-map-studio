@@ -1,5 +1,5 @@
 // Turns an Overpass API answer into map features sorted into layers.
-import type { Feature, LayerId, LonLat, Place } from './types'
+import type { Feature, LayerId, LonLat, Place, PlaceKind } from './types'
 
 interface Pt {
   lat: number
@@ -85,22 +85,39 @@ export function stitchRings(ways: LonLat[][]): { rings: LonLat[][]; dropped: num
 
 export interface ParsedMap {
   features: Feature[]
-  /** Cafés, museums, water fountains and sights, for landmark pins. */
+  /** Cafés, bakeries, museums, stations, fountains, restrooms and more, for landmark pins. */
   places: Place[]
   /** Rings of big shapes (such as a river) that were cut off and could not be closed. */
   droppedRings: number
 }
 
-/** Which kind of landmark a tagged object is, or null if it is not one. */
-export function placeKind(tags: Record<string, string>): Place['kind'] | null {
-  if (tags.amenity === 'cafe' || tags.shop === 'coffee') return 'coffee'
-  if (tags.tourism === 'museum') return 'museum'
-  if (tags.amenity === 'drinking_water') return 'water'
-  if (tags.tourism === 'attraction' || tags.tourism === 'viewpoint') return 'sight'
+/** Which kind of landmark a tagged object is, or null if it is not one. The first match wins. */
+export function placeKind(tags: Record<string, string>): PlaceKind | null {
+  const { amenity, shop, tourism, historic, leisure } = tags
+  if (amenity === 'cafe' || shop === 'coffee') return 'coffee'
+  if (shop === 'bakery' || shop === 'pastry') return 'bakery'
+  if (amenity === 'ice_cream' || shop === 'ice_cream') return 'icecream'
+  if (amenity === 'bar' || amenity === 'pub' || amenity === 'biergarten' || tags.craft === 'brewery') return 'bar'
+  if (amenity === 'restaurant') return 'food'
+  if (tourism === 'museum') return 'museum'
+  if ((historic === 'monument' || historic === 'memorial') && tags.memorial !== 'plaque') return 'monument'
+  if (leisure === 'stadium') return 'stadium'
+  if (leisure === 'park') return 'park'
+  if (tags.man_made === 'bridge') return 'bridge'
+  if (tags.railway === 'station' || tags.railway === 'halt') return 'station'
+  if (amenity === 'drinking_water') return 'water'
+  if (amenity === 'toilets') return 'toilets'
+  if (tourism === 'attraction' || tourism === 'viewpoint') return 'sight'
   return null
 }
 
-const PLACE_FALLBACK: Record<Place['kind'], string> = { coffee: 'Café', museum: 'Museum', water: 'Water', sight: 'Viewpoint' }
+const PLACE_FALLBACK: Record<PlaceKind, string> = {
+  coffee: 'Café', bakery: 'Bakery', icecream: 'Ice cream', food: 'Restaurant', bar: 'Bar', museum: 'Museum',
+  monument: 'Monument', sight: 'Viewpoint', park: 'Park', bridge: 'Bridge', stadium: 'Stadium', station: 'Station',
+  water: 'Water', toilets: 'Restrooms',
+}
+/** Kinds that mean nothing on a shirt without a name: "Park" or "Bridge" says nothing. */
+const NEEDS_NAME = new Set<PlaceKind>(['sight', 'park', 'bridge', 'stadium', 'monument', 'museum', 'station'])
 
 function placePosition(el: OverpassElement): LonLat | null {
   if (typeof el.lat === 'number' && typeof el.lon === 'number') return [el.lon, el.lat]
@@ -131,8 +148,8 @@ export function parseOverpass(data: OverpassResult): ParsedMap {
       // The same museum can come back twice: as a building outline and as a landmark.
       const id = `${el.type}/${el.id ?? places.length}`
       const at = placePosition(el)
-      // A sight with no name ("Viewpoint") tells nobody anything, so it is left out.
-      const named = !!(tags.name ?? '').trim() || kind !== 'sight'
+      // A sight or a park with no name tells nobody anything, so it is left out.
+      const named = !!(tags.name ?? '').trim() || !NEEDS_NAME.has(kind)
       if (at && named && !seen.has(id)) {
         seen.add(id)
         places.push({ id, name: (tags.name ?? '').trim() || PLACE_FALLBACK[kind], kind, at })

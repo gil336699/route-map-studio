@@ -1,4 +1,5 @@
 // Shared types for the map engine. Plain data only, so everything here is testable without React.
+import type { BadgeIcon } from './icons'
 
 /** A position as [longitude, latitude] in degrees (the GeoJSON order). */
 export type LonLat = [number, number]
@@ -36,11 +37,19 @@ export interface BBox {
   north: number
 }
 
+/**
+ * How a leg was made, so an edit next to it redraws it the same way: along the streets, as a straight
+ * line, or as part of an imported GPS track, which is never redrawn.
+ */
+export type LegKind = 'roads' | 'straight' | 'track'
+
 /** The route: clicked or imported points, plus the line between each pair. */
 export interface Route {
   points: LonLat[]
   /** legs[i] joins points[i] to points[i + 1]. */
   legs: LonLat[][]
+  /** kinds[i] says how legs[i] was made. Routes saved before 0.2.0 have none; see kindsOf. */
+  kinds?: LegKind[]
 }
 
 /** One of the club's routes. A design can show several, each in its own colour. */
@@ -49,21 +58,12 @@ export interface RouteItem {
   name: string
   color: string
   route: Route
-  /** Dashed instead of solid, so a second route can share the first one's ink. */
+  /** Dashed instead of solid, so a second route can share the first one's ink. Each route has its own. */
   dashed?: boolean
 }
 
-export type PinIcon = 'dot' | 'coffee' | 'museum' | 'water' | 'star' | 'flag' | 'label'
-
-export const PIN_ICONS: { id: PinIcon; label: string }[] = [
-  { id: 'dot', label: 'Dot' },
-  { id: 'coffee', label: 'Coffee' },
-  { id: 'museum', label: 'Museum' },
-  { id: 'water', label: 'Water' },
-  { id: 'star', label: 'Star' },
-  { id: 'flag', label: 'Flag' },
-  { id: 'label', label: 'Text only' },
-]
+/** A pin's look: a plain dot, text only (for street names), or a round badge with an icon. */
+export type PinIcon = 'dot' | 'label' | BadgeIcon
 
 /** A labelled spot such as the start, a landmark, a coffee stop or a water fountain. */
 export interface Pin {
@@ -73,11 +73,17 @@ export interface Pin {
   icon?: PinIcon
 }
 
+/** The kinds of landmark the map data is searched for, along the routes. */
+export type PlaceKind =
+  | 'coffee' | 'bakery' | 'icecream' | 'food' | 'bar'
+  | 'museum' | 'monument' | 'sight' | 'park' | 'bridge' | 'stadium'
+  | 'station' | 'water' | 'toilets'
+
 /** A point of interest found in the map data, which can be turned into a pin. */
 export interface Place {
   id: string
   name: string
-  kind: 'coffee' | 'museum' | 'water' | 'sight'
+  kind: PlaceKind
   at: LonLat
 }
 
@@ -129,11 +135,11 @@ export interface Style {
   shirt: string
   shape: Shape
   layers: Record<LayerId, LayerStyle>
-  route: { widthPt: number; outline: boolean; outlineColor: string; markers: boolean; dashed: boolean }
+  route: { widthPt: number; outline: boolean; outlineColor: string; markers: boolean }
   distance: { units: 'km' | 'mi'; markers: boolean; every: number }
   pinColor: string
-  /** What each pin icon means, for the legend. */
-  legendNames: Record<'coffee' | 'museum' | 'water' | 'star' | 'flag', string>
+  /** What each pin icon means, for the legend, where the user named it. Others use the icon's own name. */
+  legendNames: Partial<Record<BadgeIcon, string>>
   text: TextStyle
   /** Keep every road and shape as its own path instead of one compound path per layer. */
   separatePaths: boolean

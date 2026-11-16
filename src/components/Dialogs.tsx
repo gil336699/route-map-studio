@@ -19,12 +19,15 @@ export function QuickStart({ onExample, onClose }: { onExample: () => void; onCl
 }
 
 const SHORTCUTS: [string, string][] = [
-  ['D', 'Draw: click to add route points'],
+  ['D', 'Draw: click to add route points, drag a point or the line to edit'],
   ['P', 'Pin: click to drop a pin'],
   ['M', 'Move: drag the map'],
-  ['Esc', 'Back to Move, or close a dialog'],
+  ['[  ]', 'Draw: pick the previous or next point'],
+  ['Delete', 'Draw: remove the picked point'],
+  ['Esc', 'Let a picked point go, back to Move, or close a dialog'],
   ['F', 'Fit the map to the routes'],
-  ['⌘Z', 'Undo the last route point'],
+  ['⌘Z', 'Undo the last change to a route or pin'],
+  ['⇧⌘Z', 'Redo'],
   ['⌘S', 'Save the project'],
   ['⌘O', 'Open a project'],
   ['⌘E', 'Export SVG'],
@@ -46,6 +49,7 @@ export function HelpDialog({ onClose, onQuickStart }: { onClose: () => void; onQ
           <h3>Tips</h3>
           <ul className="notes">
             <li>Ask the club for a GPX of each route. In Strava on the web, open the run, then the ⋯ menu, then Export GPX.</li>
+            <li>To change a drawn route, press D. Drag a point to move it, drag the line or a + to add a detour, and click a point to remove it. Only the stretch beside the point is drawn again.</li>
             <li>If drawing along roads takes a long way round, the map is missing a path there. Undo, switch to Straight, and click again.</li>
             <li>Screen printers need lines of at least 1 pt, 2 pt for light ink on a dark shirt, and text of at least 8 pt. The print check watches for both.</li>
             <li>Map data © OpenStreetMap contributors, under the Open Database License. Keep the credit on the print or the shirt’s tag.</li>

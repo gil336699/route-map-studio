@@ -14,9 +14,11 @@ interface Props {
   covered: boolean
   onDownload: () => void
   onPickPlace: (p: PlaceResult) => void
+  /** Buildings on or off: downloads them when the map in view has none. */
+  onBuildings: (on: boolean) => void
 }
 
-export function PlacePanel({ doc, edit, loaded, loading, covered, onDownload, onPickPlace }: Props) {
+export function PlacePanel({ doc, edit, loaded, loading, covered, onDownload, onPickPlace, onBuildings }: Props) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<PlaceResult[] | null>(null)
   const [searching, setSearching] = useState(false)
@@ -78,8 +80,8 @@ export function PlacePanel({ doc, edit, loaded, loading, covered, onDownload, on
         <Switch
           label="Buildings"
           checked={doc.buildings}
-          onChange={(v) => edit((d) => ({ ...d, buildings: v }))}
-          tip="Adds building outlines. Busy at shirt size, and a much larger download. Takes effect on the next download."
+          onChange={onBuildings}
+          tip="Adds building outlines, downloading them if the map has none yet. Busy at shirt size, and a much larger download."
         />
         <div className="field-row">
           <Btn variant={covered && loaded ? undefined : 'primary'} tip={loaded ? 'Download the newest map for the area the page shows, plus a margin.' : 'Download the map for the area the page shows, plus a margin. A copy saved in this browser is used when there is one.'}

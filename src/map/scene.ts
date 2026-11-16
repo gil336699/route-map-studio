@@ -4,6 +4,7 @@
 // While it writes, it notes every ink it uses and the smallest text, so the print check reports what
 // the file really prints.
 import { haversineKm, makeProjection, pathLengthKm } from './geo'
+import { ICON_PATHS, ICON_SCALE, ICONS, type BadgeIcon } from './icons'
 import { applyInks } from './inks'
 import { routeLine } from './route'
 import { clipLine, clipRing, lineLength, ringArea, simplifyLine } from './simplify'
@@ -360,7 +361,7 @@ function buildRoute(
   const outlineColor = safeColor(r.outlineColor, '#ffffff')
   ctx.use(color)
   const n = index + 1
-  const dash = item.dashed ?? r.dashed ? ` stroke-dasharray="${fmt(wMm * 2.4)} ${fmt(wMm * 1.8)}"` : ''
+  const dash = item.dashed ? ` stroke-dasharray="${fmt(wMm * 2.4)} ${fmt(wMm * 1.8)}"` : ''
   let out = `<g id="route-${n}" data-name="${escapeXml(item.name.trim()) || `Route ${n}`}"${clip} fill="none" stroke-linecap="round" stroke-linejoin="round">`
   if (r.outline) {
     ctx.use(outlineColor)
@@ -410,27 +411,19 @@ function distanceMarkers(
   return out
 }
 
-/** Icon shapes on a unit square (-1 to 1, y down). Fills and strokes are knocked out of the badge. */
-type BadgeIcon = Exclude<PinIcon, 'dot' | 'label'>
+const ICON_INFO = new Map(ICONS.map((i) => [i.id, i]))
 
-const ICON: Record<BadgeIcon, { fill?: string; stroke?: string }> = {
-  coffee: {
-    fill: 'M-0.62 -0.18H0.36L0.28 0.42Q0.25 0.62 0.05 0.62H-0.33Q-0.53 0.62 -0.56 0.42Z',
-    stroke: 'M0.34 -0.06Q0.68 -0.06 0.64 0.18Q0.6 0.4 0.3 0.36M-0.36 -0.36Q-0.24 -0.5 -0.36 -0.66M-0.06 -0.36Q0.06 -0.5 -0.06 -0.66',
-  },
-  museum: {
-    fill: 'M-0.72 -0.26L0 -0.72L0.72 -0.26ZM-0.56 -0.16H-0.3V0.4H-0.56ZM-0.13 -0.16H0.13V0.4H-0.13ZM0.3 -0.16H0.56V0.4H0.3ZM-0.76 0.48H0.76V0.66H-0.76Z',
-  },
-  water: { fill: 'M0 -0.72C0.32 -0.3 0.54 0 0.54 0.24A0.54 0.54 0 0 1 -0.54 0.24C-0.54 0 -0.32 -0.3 0 -0.72Z' },
-  star: { fill: 'M0 -0.72L0.17 -0.23L0.68 -0.22L0.27 0.09L0.42 0.58L0 0.29L-0.42 0.58L-0.27 0.09L-0.68 -0.22L-0.17 -0.23Z' },
-  flag: { fill: 'M-0.36 -0.66L0.6 -0.42L-0.36 -0.16Z', stroke: 'M-0.4 -0.7V0.7' },
-}
+/** Whether a pin icon draws a badge with a shape in it (not a plain dot or text only). */
+const isBadge = (icon: PinIcon): icon is BadgeIcon => icon !== 'dot' && icon !== 'label' && ICON_INFO.has(icon)
+
+/** The key's name for an icon: the one the user typed, or the icon's own. */
+export const legendName = (style: Style, icon: BadgeIcon): string => style.legendNames[icon] ?? ICON_INFO.get(icon)?.legend ?? ''
 
 /** Scale an icon path from the unit square to a spot on the page. */
 function placeIcon(d: string, cx: number, cy: number, s: number): string {
   // Turn absolute commands into page coordinates. Arc radii scale, flags stay.
   return d.replace(/([MLHVQCAZ])([^MLHVQCAZ]*)/g, (_, cmd: string, args: string) => {
-    const n = args.trim() ? args.trim().split(/[\s,]+/).map(Number) : []
+    const n = args.match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi)?.map(Number) ?? []
     const xy = (i: number) => (i % 2 === 0 ? fmt(cx + (n[i] as number) * s) : fmt(cy + (n[i] as number) * s))
     if (cmd === 'H') return 'H' + fmt(cx + (n[0] as number) * s)
     if (cmd === 'V') return 'V' + fmt(cy + (n[0] as number) * s)
@@ -447,12 +440,8 @@ export function iconSvg(icon: PinIcon, color: string, knock: string, px = 20): s
   if (icon === 'label') {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5H19V8.5H14V19H10V8.5H5Z" fill="${c}"/></svg>`
   }
-  let body = `<circle cx="12" cy="12" r="${icon === 'dot' ? 5 : 11}" fill="${c}"/>`
-  if (icon !== 'dot') {
-    const g = ICON[icon]
-    if (g.fill) body += `<path d="${placeIcon(g.fill, 12, 12, 7.5)}" fill="${k}"/>`
-    if (g.stroke) body += `<path d="${placeIcon(g.stroke, 12, 12, 7.5)}" fill="none" stroke="${k}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`
-  }
+  let body = `<circle cx="12" cy="12" r="${isBadge(icon) ? 11 : 5}" fill="${c}"/>`
+  if (isBadge(icon)) body += `<path d="${placeIcon(ICON_PATHS[icon], 12, 12, 11 * ICON_SCALE)}" fill="${k}"/>`
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`
 }
 
@@ -490,10 +479,7 @@ function badge(icon: BadgeIcon | 'dot', x: number, y: number, r: number, color: 
   let out = `<circle cx="${fmt(x)}" cy="${fmt(y)}" r="${fmt(r)}" fill="${color}"${icon === 'dot' ? '' : ` stroke="${knock}" stroke-width="${fmt(Math.max(r * 0.14, minStroke))}"`}/>`
   if (icon !== 'dot') {
     ctx.use(knock)
-    const g = ICON[icon]
-    const s = r * 0.68
-    if (g.fill) out += `<path d="${placeIcon(g.fill, x, y, s)}" fill="${knock}"/>`
-    if (g.stroke) out += `<path d="${placeIcon(g.stroke, x, y, s)}" fill="none" stroke="${knock}" stroke-width="${fmt(Math.max(s * 0.16, minStroke))}" stroke-linecap="round" stroke-linejoin="round"/>`
+    out += `<path d="${placeIcon(ICON_PATHS[icon], x, y, r * ICON_SCALE)}" fill="${knock}"/>`
   }
   return out
 }
@@ -510,7 +496,7 @@ function haloText(attrs: string, label: string, size: number, knock: string, fil
 }
 
 const pinRadius = (icon: PinIcon, frame: Frame, size: number) =>
-  icon === 'dot' ? frame.widthMm * 0.007 : icon === 'label' ? 0 : Math.max(frame.widthMm * 0.013, size * 0.75)
+  icon === 'label' ? 0 : !isBadge(icon) ? frame.widthMm * 0.007 : Math.max(frame.widthMm * 0.013, size * 0.75)
 
 function buildPins(pins: Pin[], toMm: (p: LonLat) => XY, rect: { w: number; h: number }, style: Style, frame: Frame, clip: string, ctx: Ctx): string {
   if (!pins.length) return ''
@@ -541,7 +527,7 @@ function buildPins(pins: Pin[], toMm: (p: LonLat) => XY, rect: { w: number; h: n
       }
     } else {
       const r = pinRadius(icon, frame, size)
-      out += badge(icon, x, y, r, color, knock, ctx)
+      out += badge(isBadge(icon) ? icon : 'dot', x, y, r, color, knock, ctx)
       if (label) {
         const spot = placeLabel(label, x, y, r, size, rect, taken)
         const anchor = spot.anchor === 'end' ? ' text-anchor="end"' : spot.anchor === 'middle' ? ' text-anchor="middle"' : ''
@@ -555,11 +541,11 @@ function buildPins(pins: Pin[], toMm: (p: LonLat) => XY, rect: { w: number; h: n
 }
 
 /** The icons the pins use, in order, for the legend. Plain dots and text labels need no key. */
-function legendIcons(pins: Pin[]): BadgeIcon[] {
+export function legendIcons(pins: Pin[]): BadgeIcon[] {
   const out: BadgeIcon[] = []
   for (const p of pins) {
     const i = p.icon ?? 'dot'
-    if (i !== 'dot' && i !== 'label' && !out.includes(i)) out.push(i)
+    if (isBadge(i) && !out.includes(i)) out.push(i)
   }
   return out
 }
@@ -596,7 +582,7 @@ function buildText(routes: RouteItem[], routeKm: number[], pins: Pin[], frame: F
   const subtitle = t.subtitle.trim()
   const units = style.distance.units
   const firstKm = routeKm.find((k) => k > 0) ?? 0
-  const legendItems = (t.legend ? legendIcons(pins) : []).map((icon) => ({ icon, name: (style.legendNames[icon] ?? '').trim().toUpperCase() }))
+  const legendItems = (t.legend ? legendIcons(pins) : []).map((icon) => ({ icon, name: legendName(style, icon).trim().toUpperCase() }))
   const legendWidth = (size: number) =>
     legendItems.reduce((w, it) => w + size * 1.5 + textWidth(it.name, size) + size * 1.2, 0) - (legendItems.length ? size * 1.2 : 0)
   const legendAt = (x0: number, y: number, size: number) => {

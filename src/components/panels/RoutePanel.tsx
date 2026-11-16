@@ -1,11 +1,12 @@
 // Route: the club's routes, how clicks draw them, and the landmarks and pins along them.
 import { useMemo, useState } from 'react'
 import type { Doc } from '../../lib/doc'
-import { placesNear, type NearPlace } from '../../map/places'
+import { PLACE_ICON, placesNear, type NearPlace } from '../../map/places'
 import { canClose, routeLine } from '../../map/route'
 import { formatDistance, iconSvg } from '../../map/scene'
-import { PIN_ICONS, type Pin, type Place, type PinIcon } from '../../map/types'
+import type { Pin, Place, PlaceKind } from '../../map/types'
 import { Btn, ColorField, Group, Segmented, TextField } from '../Controls'
+import { IconPicker } from '../IconPicker'
 import { tip } from '../tip'
 
 export interface RouteOps {
@@ -15,6 +16,7 @@ export interface RouteOps {
   recolorRoute: (id: string, color: string) => void
   setDashed: (id: string, dashed: boolean) => void
   undo: () => void
+  redo: () => void
   closeLoop: () => void
   clear: () => void
   importRoute: () => void
@@ -34,14 +36,30 @@ interface Props {
   routeKm: number[]
   places: Place[]
   ops: RouteOps
+  /** What Undo and Redo would take back or make again, such as "removing a point", or null for nothing. */
+  undoWhat: string | null
+  redoWhat: string | null
 }
 
-const KINDS: { id: Place['kind']; label: string; icon: PinIcon }[] = [
-  { id: 'coffee', label: 'Coffee', icon: 'coffee' },
-  { id: 'museum', label: 'Museums', icon: 'museum' },
-  { id: 'water', label: 'Water', icon: 'water' },
-  { id: 'sight', label: 'Sights', icon: 'star' },
+const KINDS: { id: PlaceKind; label: string }[] = [
+  { id: 'coffee', label: 'Coffee' },
+  { id: 'bakery', label: 'Bakeries' },
+  { id: 'icecream', label: 'Ice cream' },
+  { id: 'bar', label: 'Bars and breweries' },
+  { id: 'food', label: 'Restaurants' },
+  { id: 'museum', label: 'Museums' },
+  { id: 'monument', label: 'Monuments' },
+  { id: 'sight', label: 'Sights' },
+  { id: 'park', label: 'Parks' },
+  { id: 'bridge', label: 'Bridges' },
+  { id: 'stadium', label: 'Stadiums' },
+  { id: 'station', label: 'Stations' },
+  { id: 'water', label: 'Water' },
+  { id: 'toilets', label: 'Restrooms' },
 ]
+/** Restaurants start hidden: a city has so many that they would push every other kind off the list. */
+const START_KINDS = KINDS.map((k) => k.id).filter((k) => k !== 'food')
+const LIST_MAX = 40
 
 /** The same array as last time when every item is the same object, so memos keyed on it hold. */
 function useSameItems<T>(items: T[]): T[] {
@@ -51,18 +69,19 @@ function useSameItems<T>(items: T[]): T[] {
   return same ? kept : items
 }
 
-export function RoutePanel({ doc, selectedId, onSelect, follow, setFollow, hasMap, routeKm, places, ops }: Props) {
+export function RoutePanel({ doc, selectedId, onSelect, follow, setFollow, hasMap, routeKm, places, ops, undoWhat, redoWhat }: Props) {
   const [maxM, setMaxM] = useState<'100' | '200' | '400'>('200')
-  const [kinds, setKinds] = useState<Set<Place['kind']>>(() => new Set(['coffee', 'museum', 'water', 'sight']))
+  const [kinds, setKinds] = useState<Set<PlaceKind>>(() => new Set(START_KINDS))
   const units = doc.style.distance.units
   const selected = doc.routes.find((r) => r.id === selectedId) ?? doc.routes[0]
   // Renaming or recolouring a route keeps its shape, so the landmark search does not run again.
   const shapes = useSameItems(doc.routes.map((r) => r.route))
   const lines = useMemo(() => shapes.map(routeLine).filter((l) => l.length > 1), [shapes])
-  const near = useMemo(
-    () => placesNear(places.filter((p) => kinds.has(p.kind)), lines, Number(maxM)).slice(0, 40),
+  const nearAll = useMemo(
+    () => placesNear(places.filter((p) => kinds.has(p.kind)), lines, Number(maxM)),
     [places, kinds, lines, maxM],
   )
+  const near = nearAll.slice(0, LIST_MAX)
   const pinIds = new Set(doc.pins.map((p) => p.id))
   const pointsLeft = selected ? selected.route.points.length : 0
   const knock = doc.style.transparent ? doc.style.shirt : doc.style.background
@@ -78,8 +97,8 @@ export function RoutePanel({ doc, selectedId, onSelect, follow, setFollow, hasMa
               <label htmlFor={`route-${r.id}`} className="route-pick" {...tip('Draw on this route.')}>
                 <TextField value={r.name} onChange={(v) => ops.renameRoute(r.id, v)} label={`Name of route ${i + 1}`} tip="The name used in the stats line and the layer name." />
               </label>
-              <button type="button" className={(r.dashed ?? doc.style.route.dashed) ? 'chip dash on' : 'chip dash'} aria-pressed={!!(r.dashed ?? doc.style.route.dashed)}
-                onClick={() => ops.setDashed(r.id, !(r.dashed ?? doc.style.route.dashed))} aria-label={`Dashed line for ${r.name}`}
+              <button type="button" className={r.dashed ? 'chip dash on' : 'chip dash'} aria-pressed={!!r.dashed}
+                onClick={() => ops.setDashed(r.id, !r.dashed)} aria-label={`Dashed line for ${r.name}`}
                 {...tip('Dashed or solid. A dashed second route can share the first one’s ink.')}>- -</button>
               <span className="route-km" {...tip('Length of the route as drawn.')}>{(routeKm[i] ?? 0) > 0 ? formatDistance(routeKm[i] ?? 0, units) : '—'}</span>
               <Btn variant="quiet" className="icon" label={`Delete ${r.name}`} tip="Delete this route." onClick={() => ops.deleteRoute(r.id)}
@@ -94,7 +113,7 @@ export function RoutePanel({ doc, selectedId, onSelect, follow, setFollow, hasMa
         </div>
       </Group>
 
-      <Group title="Draw" hint={hasMap ? 'Press D, then click the map. Each click adds a point to the selected route.' : 'Download a map first to draw along its roads. Straight lines work any time.'}>
+      <Group title="Draw" hint={hasMap ? 'Press D, then click the map to add points. Drag a point to move it, drag the line to add a detour, click a point to remove it.' : 'Download a map first to draw along its roads. Straight lines work any time.'}>
         <Segmented
           label="How clicks join points"
           value={follow ? 'roads' : 'straight'}
@@ -105,14 +124,16 @@ export function RoutePanel({ doc, selectedId, onSelect, follow, setFollow, hasMa
           ]}
         />
         <div className="btn-row">
-          <Btn tip="Remove the last point of the selected route." shortcut="⌘Z" onClick={ops.undo} disabledReason={pointsLeft ? undefined : 'The selected route has no points yet.'}>Undo point</Btn>
+          <Btn tip={`Undo ${undoWhat ?? 'the last change'}.`} shortcut="⌘Z" onClick={ops.undo} disabledReason={undoWhat ? undefined : 'Nothing to undo yet.'}>Undo</Btn>
+          <Btn tip={`Redo ${redoWhat ?? 'what you undid'}.`} shortcut="⇧⌘Z" onClick={ops.redo} disabledReason={redoWhat ? undefined : 'Nothing to redo.'}>Redo</Btn>
           <Btn tip="Join the last point back to the first." onClick={ops.closeLoop}
             disabledReason={selected && canClose(selected.route) ? undefined : selected && routeLine(selected.route).length >= 3 ? 'The loop is already closed.' : 'A loop needs at least 3 points.'}>Close loop</Btn>
           <Btn variant="danger" tip="Remove every point of the selected route." onClick={ops.clear} disabledReason={pointsLeft ? undefined : 'The selected route is already empty.'}>Clear</Btn>
         </div>
       </Group>
 
-      <Group title="Landmarks near the routes" hint={!hasMap ? 'Download a map to find cafés, museums, fountains and sights.' : !lines.length ? 'Draw a route to see what is along it.' : `${near.length} within ${maxM} m. Tick the ones to show on the print.`}>
+      <Group title="Landmarks near the routes" hint={!hasMap ? 'Download a map to find cafés, bakeries, museums, stations, fountains and more.' : !lines.length ? 'Draw a route to see what is along it.'
+        : nearAll.length > LIST_MAX ? `The ${LIST_MAX} nearest of ${nearAll.length} within ${maxM} m. Tick the ones to show on the print.` : `${near.length} within ${maxM} m. Tick the ones to show on the print.`}>
         <div className="chips" role="group" aria-label="Kinds of landmark">
           {KINDS.map((k) => (
             <button key={k.id} type="button" className={kinds.has(k.id) ? 'chip on' : 'chip'} aria-pressed={kinds.has(k.id)}
@@ -131,11 +152,10 @@ export function RoutePanel({ doc, selectedId, onSelect, follow, setFollow, hasMa
           <ul className="landmarks">
             {near.map((p: NearPlace) => {
               const on = pinIds.has(p.id)
-              const kind = KINDS.find((k) => k.id === p.kind)
               return (
                 <li key={p.id}>
                   <label className="landmark" {...tip(on ? 'On the print. Untick to remove it.' : 'Tick to put this on the print as a pin.')}>
-                    <span className="icon-svg" dangerouslySetInnerHTML={{ __html: iconSvg(kind?.icon ?? 'dot', doc.style.pinColor, knock, 20) }} />
+                    <span className="icon-svg" dangerouslySetInnerHTML={{ __html: iconSvg(PLACE_ICON[p.kind] ?? 'dot', doc.style.pinColor, knock, 20) }} />
                     <span className="name">{p.name}</span>
                     <span className="dist">{Math.round(p.distM)} m</span>
                     <input type="checkbox" checked={on} onChange={() => ops.togglePlace(p)} aria-label={`Show ${p.name} on the print`} />
@@ -152,10 +172,7 @@ export function RoutePanel({ doc, selectedId, onSelect, follow, setFollow, hasMa
           <ul className="pins">
             {doc.pins.map((p) => (
               <li key={p.id} className="pin-row">
-                <span className="icon-svg" dangerouslySetInnerHTML={{ __html: iconSvg(p.icon ?? 'dot', doc.style.pinColor, knock, 20) }} />
-                <select className="select" aria-label={`Icon for ${p.label || 'pin'}`} value={p.icon ?? 'dot'} onChange={(e) => ops.updatePin(p.id, { icon: e.target.value as PinIcon })} {...tip('The pin’s icon. Text only shows just the label, for street names.')}>
-                  {PIN_ICONS.map((i) => <option key={i.id} value={i.id}>{i.label}</option>)}
-                </select>
+                <IconPicker value={p.icon ?? 'dot'} onChange={(icon) => ops.updatePin(p.id, { icon })} color={doc.style.pinColor} knock={knock} label={`Icon for ${p.label || 'pin'}`} />
                 <TextField id={`pin-label-${p.id}`} value={p.label} onChange={(v) => ops.updatePin(p.id, { label: v })} label="Pin label" placeholder="Label" tip="Printed in capitals next to the pin. Leave empty for an icon alone." />
                 <Btn variant="quiet" className="icon" label={`Delete pin ${p.label}`} tip="Delete this pin." onClick={() => ops.deletePin(p.id)}>✕</Btn>
               </li>

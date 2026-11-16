@@ -1,5 +1,6 @@
 // Messages between the page and the map engine worker.
 import type { PrintCheck } from '../lib/printcheck'
+import type { RouteEdit } from '../map/route'
 import type { BBox, Detail, Frame, LayerId, LonLat, Pin, Place, Route, RouteItem, SceneStats, Style } from '../map/types'
 
 export type EngineRequest =
@@ -9,6 +10,8 @@ export type EngineRequest =
   | { id: number; type: 'add-point'; route: Route; p: LonLat; follow: boolean }
   | { id: number; type: 'close-loop'; route: Route; follow: boolean }
   | { id: number; type: 'route-from-points'; points: LonLat[]; follow: boolean; loop: boolean }
+  /** Remove, move or insert a point of a drawn route. A preview leaves the street network untouched. */
+  | { id: number; type: 'edit-route'; route: Route; op: RouteEdit; preview?: boolean }
 
 export type EngineResponse =
   | {
@@ -24,6 +27,8 @@ export type EngineResponse =
       cachedAt?: number
       /** This map's number: 1 for the first map the engine loads, 2 for the next, and so on. */
       mapId: number
+      /** Whether this map was downloaded with buildings. */
+      buildings: boolean
     }
   | { id: number; type: 'cancelled' }
   | {
@@ -38,7 +43,7 @@ export type EngineResponse =
       /** The number of the map this picture was drawn from, or 0 if none had been loaded. */
       mapId: number
     }
-  | { id: number; type: 'route'; route: Route; note?: string }
+  | { id: number; type: 'route'; route: Route; note?: string; /** For an insert: the new point's place in the list. */ index?: number }
   | { id: number; type: 'error'; message: string }
   /** Not an answer: news about a request that is still running. */
   | { id: number; type: 'progress'; text: string }

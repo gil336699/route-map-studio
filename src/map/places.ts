@@ -1,6 +1,7 @@
 // Landmarks near a route: the cafés, museums, water fountains and sights a club passes or stops at.
 import { simplifyLine } from './simplify'
-import type { LonLat, Place, XY } from './types'
+import type { BadgeIcon } from './icons'
+import type { LonLat, Place, PlaceKind, XY } from './types'
 
 const M_PER_DEG_LAT = 110574
 const M_PER_DEG_LON = 111320
@@ -73,4 +74,9 @@ export function placesNear(places: Place[], lines: LonLat[][], maxM: number): Ne
   return out.sort((a, b) => a.distM - b.distM || a.name.localeCompare(b.name))
 }
 
-export const PLACE_ICON = { coffee: 'coffee', museum: 'museum', water: 'water', sight: 'star' } as const
+/** The icon each kind of landmark gets when it is ticked onto the print. */
+export const PLACE_ICON: Record<PlaceKind, BadgeIcon> = {
+  coffee: 'coffee', bakery: 'bakery', icecream: 'icecream', food: 'food', bar: 'beer',
+  museum: 'museum', monument: 'monument', sight: 'star', park: 'park', bridge: 'bridge', stadium: 'stadium',
+  station: 'train', water: 'water', toilets: 'toilets',
+}

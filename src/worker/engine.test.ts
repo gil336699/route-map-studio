@@ -4,7 +4,7 @@ import { memoryCache } from '../lib/mapcache'
 import { parseOverpass, type OverpassResult } from '../map/osm'
 import { DEFAULT_DETAIL, DEFAULT_FRAME, DEFAULT_STYLE } from '../lib/presets'
 import type { BBox, LonLat } from '../map/types'
-import { applyLook, defaultUnits, downloadBox, fitFrame, isCovered, movedFrame, newDoc } from '../lib/doc'
+import { applyLook, defaultUnits, downloadBox, fitFrame, isCovered, movedFrame, newDoc, setBuildings } from '../lib/doc'
 import { LOOKS } from '../lib/presets'
 import { makeProjection } from '../map/geo'
 import { mapFrame } from '../map/scene'
@@ -109,6 +109,30 @@ describe('map engine', () => {
     expect((await engine.handle({ id: 5, type: 'load', bbox: box, buildings: false, fresh: true })).type).toBe('error')
     const still = await scene(6)
     expect(still.type === 'scene' && still.mapId).toBe(2)
+  })
+})
+
+describe('buildings', () => {
+  it('says whether a map came with buildings, from a download or a saved copy', async () => {
+    const engine = createEngine(async () => parseOverpass(fixture))
+    const plain = await engine.handle({ id: 1, type: 'load', bbox: box, buildings: false })
+    expect(plain.type === 'loaded' && plain.buildings).toBe(false)
+    const withThem = await engine.handle({ id: 2, type: 'load', bbox: box, buildings: true })
+    expect(withThem.type === 'loaded' && withThem.buildings).toBe(true)
+    const copy = await engine.handle({ id: 3, type: 'load', bbox: box, buildings: true })
+    expect(copy.type === 'loaded' && !!copy.cachedAt && copy.buildings).toBe(true)
+  })
+  it('are one setting: downloaded and shown together, and a look keeps them', () => {
+    const on = setBuildings(newDoc(), true)
+    expect([on.buildings, on.style.layers.buildings.show]).toEqual([true, true])
+    for (const look of LOOKS) {
+      const kept = applyLook(on, look)
+      expect([look.id, kept.buildings, kept.style.layers.buildings.show]).toEqual([look.id, true, true])
+      expect(kept.style.layers.buildings.color).toBe(look.style.layers.buildings.color)
+    }
+    const off = setBuildings(on, false)
+    expect([off.buildings, off.style.layers.buildings.show]).toEqual([false, false])
+    expect(applyLook(off, LOOKS[0]!).style.layers.buildings.show).toBe(false)
   })
 })
 

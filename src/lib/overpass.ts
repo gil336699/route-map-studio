@@ -23,9 +23,14 @@ export function buildQuery(b: BBox, buildings: boolean): string {
     `way["leisure"~"^(park|garden|nature_reserve)$"](${box});rel["leisure"~"^(park|garden|nature_reserve)$"](${box});` +
     (buildings ? `way["building"](${box});` : '') +
     `);out geom;` +
-    // Landmarks come back as single points (centres), which is all a pin needs.
-    `(node["amenity"~"^(cafe|drinking_water)$"](${box});way["amenity"="cafe"](${box});nwr["shop"="coffee"](${box});` +
-    `nwr["tourism"~"^(museum|attraction|viewpoint)$"](${box}););out center;`
+    // Landmarks come back as single points (centres), which is all a pin needs. Parks, bridges and
+    // stadiums are only worth a pin with a name.
+    `(nwr["amenity"~"^(cafe|drinking_water|toilets|bar|pub|biergarten|restaurant|ice_cream)$"](${box});` +
+    `nwr["shop"~"^(coffee|bakery|pastry|ice_cream)$"](${box});nwr["craft"="brewery"](${box});` +
+    `nwr["tourism"~"^(museum|attraction|viewpoint)$"](${box});` +
+    `nwr["historic"~"^(monument|memorial)$"]["memorial"!="plaque"]["name"](${box});` +
+    `nwr["leisure"~"^(park|stadium)$"]["name"](${box});nwr["man_made"="bridge"]["name"](${box});` +
+    `nwr["railway"~"^(station|halt)$"](${box}););out center;`
   )
 }
 

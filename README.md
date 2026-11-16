@@ -1,6 +1,6 @@
 # Route Map Studio
 
-Route Map Studio is a browser app that turns a running club's route into a print-ready map for a T-shirt. Find the place, draw the route by clicking along the streets (or import a GPX from Strava), tick the cafés and landmarks along it, pick a look, and hold it to 1, 2 or 3 inks for a cheaper screen print. Export a real-size SVG for Illustrator, with one named group per layer and live text, or a 300 dpi PNG. Map data comes from OpenStreetMap.
+Route Map Studio is a browser app that turns a running club's route into a print-ready map for a T-shirt. Find the place, draw the route by clicking along the streets and drag it into shape (or import a GPX from Strava), tick the cafés, stations and landmarks along it, pick a look, and hold it to 1, 2 or 3 inks for a cheaper screen print. Export a real-size SVG for Illustrator, with one named group per layer and live text, or a 300 dpi PNG. Map data comes from OpenStreetMap.
 
 **Use it online:** https://gil336699.github.io/route-map-studio/
 
@@ -30,22 +30,23 @@ Every push to `main` is built and published to GitHub Pages by `.github/workflow
 - **Print.** The print fills the window at its real proportions, on the shirt colour. What you see is exactly what exports. The layers are named after what they hold, and each route's layer after the route.
 - **Left panel.** Five tabs in the order a designer works: **Place** (find the area, download the map), **Route** (routes, drawing, landmarks and pins), **Look** (starting looks, inks, shirt, layers, route line, detail), **Text** (title, distance, key) and **Export** (print size, files).
 - **Top right.** Open, Save project (a dot means unsaved changes), Export SVG and **?** for help. Below it, the **print check**: the inks the print needs, the ink limit, and any warnings.
-- **Bottom.** The Draw, Pin and Move tools, the status, and the switch between the print and the print **On shirt**. While a map downloads or is drawn, a card on the print says so.
+- **Bottom.** The Draw, Pin and Move tools, the status, and the switch between the print and the print **On shirt**. While a map downloads or is drawn, a card on the print says so. In the Draw tool the selected route's points are handles to drag or click, with a + halfway along each stretch that is long enough on screen.
 
 In a window under 1500 px wide the status gets a row of its own under the tools, so long messages show in full. On a narrow window the panels slim down; on a tablet or phone the print sits on top and everything else follows below it, in one column.
 
 ## Help in the app
 
-Every control describes itself, with its shortcut, when you hover over it or Tab to it (a click does not pop one up). Unavailable controls say why, for example "A loop needs at least 3 points." A three-step quick start greets first visits, with an example to start from, and **?** lists every shortcut. Clearing or deleting a route, and opening a project over unsaved work, ask first.
+Every control describes itself, with its shortcut, when you hover over it or Tab to it (a click does not pop one up). Unavailable controls say why, for example "A loop needs at least 3 points." A three-step quick start greets first visits, with an example to start from, and **?** lists every shortcut. Clearing or deleting a route, and opening a project over unsaved work, ask first. Undo (⌘Z) takes back any change to a route or a pin, and the status says what it took back.
 
 ## Workflow
 
 1. **Place.** Search for a park, a street or a city. Picking a result centres the map and downloads it. Or type the centre and the width on the ground, then press **Download map**.
 2. **Route.** Press **D** and click along the route. Each point joins the last along roads and trails; switch to **Straight** where the map is missing a path. Or press **Import GPX**: in Strava on the web, open the run, then the ⋯ menu, then **Export GPX**. Add more routes with **+ New route**; each gets its own colour and layer.
-3. **Landmarks.** The Route tab lists the cafés, museums, water fountains and sights near the routes. Tick the ones to show. Press **P** and click for a pin of your own, or set a pin to **Text only** for a street name.
-4. **Look.** Pick a starting look. For screen printing, set **Inks** to 1, 2 or 3: every colour is mapped onto that many inks, and the shirt shows through as the background. Adjust the layers, line weights, frame and detail.
-5. **Text.** Type the club name and a subtitle. Turn on **Big number** for a race-shirt distance like 13.1, typed or taken from the route, and **Show a key** to name the icons ("Coffee stops").
-6. **Export.** Choose the print size (12 × 14 in for a shirt back by default) and press **Export SVG**. **Save project** keeps the routes, pins and settings to open later.
+3. **Edit.** Still in Draw, drag a point to move it, drag the line (or a +) to add a detour, and click a point to remove it. Only the stretches beside the point are drawn again, each the way it was drawn, along the streets or straight. A click on the line itself adds the next point at the end, for a route that goes back the way it came. **[** and **]** step through the points by keyboard, and Delete removes the one picked. An imported GPX track stays exactly as recorded.
+4. **Landmarks.** The Route tab lists what is near the routes: cafés, bakeries, ice cream, bars and breweries, restaurants, museums, monuments, sights, parks, bridges, stadiums, stations, water and restrooms. Tick the ones to show; each comes in with its own icon. Press **P** and click for a pin of your own, such as the club's meeting point or a company's office, and pick its icon from 41, or set it to **Text only** for a street name.
+5. **Look.** Pick a starting look. For screen printing, set **Inks** to 1, 2 or 3: every colour is mapped onto that many inks, and the shirt shows through as the background. Adjust the layers, line weights, frame and detail.
+6. **Text.** Type the club name and a subtitle. Turn on **Big number** for a race-shirt distance like 13.1, typed or taken from the route, and **Show a key** to name the icons ("Coffee stops").
+7. **Export.** Choose the print size (12 × 14 in for a shirt back by default) and press **Export SVG**. **Save project** keeps the routes, pins and settings to open later.
 
 ### Working with Illustrator
 
@@ -105,23 +106,25 @@ The rules come from printers' artwork guides, which differ, so the check advises
 | --- | --- |
 | Find a place | Searches OpenStreetMap's Nominatim. Picking a result sets the centre and a width that fits the place, and downloads it. |
 | Centre, Width on the ground | Where the map is and how much of the world the print shows, 0.2 to 40 km across. |
-| Buildings | Adds building outlines on the next download. Busy at shirt size, and a much larger download. |
-| Along roads and trails, Straight | How each new point joins the last. Along roads needs a downloaded map. |
-| Undo point, Close loop, Clear | Edit the selected route. |
+| Buildings | Building outlines, downloaded when the map has none; the same setting as the Buildings layer in the Look tab. Busy at shirt size, and a much larger download. If the download fails or is stopped, it turns back off. |
+| Along roads and trails, Straight | How each new point joins the last, and how a stretch is joined again when a point between a roads stretch and a straight one is removed. Along roads needs a downloaded map. |
+| Points on the map (Draw) | Drag to move; drag the line or a + to add a detour; click, then **Remove point** or Delete, to take one out; click a + to add a point on the line. |
+| Undo, Redo | Take back, or make again, the last change to a route or a pin. |
+| Close loop, Clear | Join the end back to the start, or remove every point of the selected route. |
 | Fit | Moves and zooms the map so every route fits the page. |
-| Landmarks | Coffee, Museums, Water and Sights, within 100, 200 or 400 m of any route. |
-| Pins | Icon (dot, coffee, museum, water, star, flag or text only) and label, printed in capitals. |
+| Landmarks | 14 kinds (restaurants off to start), within 100, 200 or 400 m of any route. The list shows the 40 nearest. |
+| Pins | Icon (a dot, text only, or one of 41 in five groups: Running, Food and drink, Places, Getting there, Everyday) and label, printed in capitals. |
 | Starting look | Sets every colour and the layout; keeps your words, routes, pins, units and ink limit. |
 | Inks | Any, 1, 2 or 3, with a colour for each ink. |
 | Shirt colour | For the preview and the print check. Never printed. |
 | Print a background | A solid background behind the map. It costs an ink. |
 | Frame | Full, Rounded or Circle. |
-| Map layers | Show, colour and line width (pt) for main roads, streets, paths, railways, buildings, water and parks. **Banks** draws the river as its edges. |
-| Route line | Width, knockout outline, dashed, start and finish dots, distance markers and their spacing, miles or kilometres. |
+| Map layers | Show, colour and line width (pt) for main roads, streets, paths, railways, buildings, water and parks. **Banks** draws the river as its edges. With an ink limit, parks are left out, and their switch says why. |
+| Route line | Width, knockout outline, dashed (every route; each route's - - button in the Route tab sets just that one), start and finish dots, distance markers and their spacing, miles or kilometres. |
 | Detail | Smooth lines (0 to 1 mm), shortest line and smallest shape kept. |
 | Words | Title (shrinks to fit), subtitle, colour. |
 | Distance | Big number (typed, or the first route's length) or a distance line naming each route. |
-| Key | Names each pin icon in use. |
+| Key | Names each pin icon in use, by what it marks (Stations, Offices) until you type another name. |
 | Layout | Text below the map or over it (on a plate in the shirt colour); left or centred. |
 | Print size, Units | Presets for shirt backs and fronts, pockets, Letter, A4 and square, or any size; mm, in, pt or px. The map keeps its width on the ground. |
 | OpenStreetMap credit | Small, up the right edge. Turn it off if the credit goes on the shirt's tag. |
@@ -130,11 +133,14 @@ The rules come from printers' artwork guides, which differ, so the check advises
 
 | Key | Action |
 | --- | --- |
-| D | Draw: click to add route points |
+| D | Draw: click to add route points; drag a point or the line to edit |
 | P | Pin: click to drop a pin |
 | M or Esc | Move: drag the map |
+| [ and ] | Draw: pick the previous or next point |
+| Delete | Draw: remove the picked point |
+| Esc | Let a picked point go |
 | F | Fit the map to the routes |
-| ⌘Z | Undo the last route point |
+| ⌘Z, ⇧⌘Z | Undo and redo changes to routes and pins |
 | ⌘S | Save the project |
 | ⌘O | Open a project |
 | ⌘E | Export SVG |
@@ -146,11 +152,12 @@ On the print, scroll or pinch to zoom and drag to move. On a touch screen, one f
 
 The page sends the map engine requests in a Web Worker, so downloading, reading and drawing never freeze the window.
 
-1. **Download.** One Overpass query fetches the streets, paths and trails (leaving out mapped sidewalks and crossings, which double every street), railways, rivers, water, parks, and the cafés, museums, fountains and sights, for the page's area plus a 15 % margin. Rivers and lakes mapped as multipolygons are stitched into closed rings.
+1. **Download.** One Overpass query fetches the streets, paths and trails (leaving out mapped sidewalks and crossings, which double every street), railways, rivers, water, parks, and the landmarks, for the page's area plus a 15 % margin. Landmarks come back as centre points; parks, bridges, stadiums, monuments and stations only with a name, and memorial plaques not at all. Rivers and lakes mapped as multipolygons are stitched into closed rings.
 2. **Route.** The streets, paths and trails (but not motorways) form a graph. A click lands on the nearest point of a street within 200 m, preferring the connected network the previous point is on, and that street is split there, so a point sits exactly where it was clicked. Dijkstra's algorithm finds the shortest way from the previous point. A click farther than 200 m from any street (in a river, say) stays where it was made and joins with a straight line, and the status says so.
-3. **Draw.** Each feature is projected onto the page in millimetres with a local flat projection, simplified (Douglas-Peucker), clipped to the page, and short lines and small shapes are dropped. The SVG is built as text; the preview shows that same text, so exports hold exactly what the view shows.
-4. **Inks.** With an ink limit, colours are mapped onto the inks by role before drawing. As the SVG is written, every ink it uses and the smallest text it sets are noted, so the print check reports what the file really prints.
-5. **Servers.** Each public Overpass server gets 100 s. A busy, slow or broken one passes the download to the next (overpass-api.de, then overpass.private.coffee, then overpass.kumi.systems), and when all are busy the app waits 20 s and goes round once more, as Overpass asks. The status says what is happening, and Stop works at any point.
+3. **Edit.** Each stretch remembers how it was made: along the streets, straight, or an imported track. Moving, inserting or removing a point draws again only the stretches that meet it, each its own way, so the rest of the route stays exactly as it was. While a point is dragged, the engine works the new route out again on every move (one request at a time, the newest winning) without touching the street graph: the splits a preview makes are taken back at once. Undo keeps the last 200 changes, each naming the one route or pin it touched.
+4. **Draw.** Each feature is projected onto the page in millimetres with a local flat projection, simplified (Douglas-Peucker), clipped to the page, and short lines and small shapes are dropped. The SVG is built as text; the preview shows that same text, so exports hold exactly what the view shows.
+5. **Inks.** With an ink limit, colours are mapped onto the inks by role before drawing. As the SVG is written, every ink it uses and the smallest text it sets are noted, so the print check reports what the file really prints.
+6. **Servers.** Each public Overpass server gets 100 s. A busy, slow or broken one passes the download to the next (overpass-api.de, then overpass.private.coffee, then overpass.kumi.systems), and when all are busy the app waits 20 s and goes round once more, as Overpass asks. The status says what is happening, and Stop works at any point.
 
 **Limits, honestly.** The projection is flat, which is accurate to well under 1 % across a city but not across a country. Map data is only as good as OpenStreetMap: a missing footbridge or a path joined to nothing sends routing the long way round, and the app says so with the numbers. Text sizes are estimated for layout, so a very long title or label in a narrow space can still crowd its neighbours.
 
@@ -160,7 +167,10 @@ The page sends the map engine requests in a Web Worker, so downloading, reading 
 | --- | --- |
 | Download | 25 s and 46 s for the example around the Philadelphia Art Museum, on two runs. On 2026-11-15 all three public servers were at capacity or not answering for over an hour; the app then retries, says so, and opens the browser's copy when it has one. |
 | Data | Leaving out mapped sidewalks and crossings cut a 6.6 × 7.3 km area from 27,527 to 11,504 map objects (with 324 landmarks, 8.4 MB, against 19.5 MB). |
+| Landmarks | The 14 kinds add about 1 MB (12 %) to a 10 × 10 km download of central Philadelphia: 1,924 landmarks, 765 of them restaurants. |
 | Routing | 49,629 nodes for that area. A click, including snapping and the shortest way, takes about 10 ms. |
+| Editing | On a 23-point route drawn over that area: moving a point or a detour 21 to 22 ms, removing a point 7 ms, adding one on the line under 1 ms. A drag redraws its preview up to about 40 times a second. |
+| Buildings | 6,550 buildings around the Art Museum (2.1 × 2.4 km) were a 6.5 MB, 88 s download from a public server. At 2.4 km across, most row houses are smaller than the 1 mm² **Smallest shape** and are left out; lower it to keep them. |
 | Drawing | 4 to 20 ms per picture for a 12 × 14 in print of that area. |
 | Files | SVG 45 to 210 KB for a 12 × 14 in print with one compound path per layer (89 KB in the QA run). PNG at 300 dpi: 3600 × 4200 px, 1.8 MB, made in 0.2 s. |
 | Area | Up to 40 km across. Large areas download slowly and may be refused by the server. |
@@ -178,8 +188,8 @@ npm run preview   # serve the production build
 
 | Folder | What is there |
 | --- | --- |
-| `src/map/` | The engine, plain TypeScript: projection, simplify and clip, OSM parsing, routing graph, routes, landmarks, inks and the SVG scene. |
-| `src/lib/` | Overpass and Nominatim requests, project files, presets and looks, units, print check, files, document helpers, the worker hook, and the card the print shows while it waits for a map. |
+| `src/map/` | The engine, plain TypeScript: projection, simplify and clip, OSM parsing, routing graph, routes and route editing, landmarks, pin icons, inks and the SVG scene. |
+| `src/lib/` | Overpass and Nominatim requests, project files, presets and looks, units, print check, files, document helpers, undo and redo, the worker hook, and the card the print shows while it waits for a map. |
 | `src/worker/` | The map engine worker and its messages. |
 | `src/components/` | The interface: viewport, panels, dock, top bar, print check, dialogs, tooltip layer and controls. |
 | `docs/` | Research notes with sources. |
@@ -188,3 +198,5 @@ npm run preview   # serve the production build
 ## License
 
 MIT. Map data © OpenStreetMap contributors, available under the Open Database License (openstreetmap.org/copyright).
+
+Pin icons: [Maki](https://github.com/mapbox/maki) and [Temaki](https://github.com/rapideditor/temaki), both CC0 1.0 (public domain), so prints made with them need no credit. The runner and the running shoe are from [Phosphor](https://github.com/phosphor-icons/core), MIT; its licence is in `src/map/icons.ts`.

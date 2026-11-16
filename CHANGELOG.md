@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0 2026-11-16
+
+- Edit a drawn route right on the map. In the Draw tool, drag a point to move it. Drag the line, or the + halfway along a stretch, to add a detour. Click a point, then **Remove point** or Delete, to take it out. A click on a + adds a point without changing the line, ready to drag later. Only the stretches beside the point are drawn again, each the way it was drawn: along the streets, or straight. While you drag, the new way shows as a dashed line. Before, the only way to change a route was Undo point, which took the last point off the end.
+- **[** and **]** pick the previous or next point by keyboard, and the map moves to a point out of view. Delete removes it, Esc lets it go.
+- Undo and Redo (⌘Z and ⇧⌘Z, or the buttons in the Route tab) take back any change to a route or a pin: an added, moved or removed point, a detour, a closed loop, a cleared or deleted route, an import, a pin dropped, removed or given a new icon. A rename or a new colour made since stays. Before, ⌘Z only took off the last point.
+- A route imported from GPX stays exactly as recorded: it shows no handles, and a drag on it moves the map. Points drawn on after it can still be edited.
+- 41 pin icons instead of 5, in five groups (Running, Food and drink, Places, Getting there, Everyday): a runner, a start and finish flag, restrooms, first aid, a bakery, a brewery, an office building for a company, a train station, a stadium, a boat, and more. Pick them from a grid that shows each icon as it prints. Before, a station or a company had to borrow the star or the flag. The icons are Maki and Temaki, public domain, so a shirt printed with them needs no credit; the runner and the running shoe are Phosphor (MIT).
+- The landmark finder looks for more kinds: bakeries, ice cream, bars and breweries, restaurants (off to start, as a city has so many), monuments, parks, bridges, stadiums, stations and restrooms, as well as cafés, museums, water and sights. Each comes in with its own icon. With 14 kinds the list shows the 40 nearest and says how many there are. The map download grows by about a tenth.
+- The key names each icon by what it marks (Stations, Offices, Bridges) until you type your own name.
+- The Buildings switch works. Turning it on downloads the buildings when the map has none, and shows them at once. The switches in the Place and Look tabs are now one setting, and a new look keeps it. If the download fails or is stopped, the switch goes back off and says so. Before, buildings showed only after turning on the Place switch, downloading again and turning on the Look switch, and every look turned them off again.
+- The Dashed switch works. In the Look tab it is now **Dash every route**, and each route's - - button in the Route tab dashes just that one. Before, the switch did nothing, because every route kept a setting of its own.
+- With an ink limit, the Parks switch shows off and says why: parks would need an ink of their own. Before, it could be switched on with no effect.
+- Project files keep how each stretch was drawn. Files from 0.1 open as before, with their buildings and dashed settings read the way they were meant.
+
 ## 0.1.2 2026-11-16
 
 - Clicking a control no longer pops up its tooltip. Tooltips show when you hover, after a short pause, or at once when you Tab to a control. Before, every click showed one right under the pointer, text fields included.

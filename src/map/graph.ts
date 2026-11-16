@@ -9,6 +9,17 @@ export interface Graph {
   /** Which connected piece of the network each node is in, and how big each piece is. */
   comp: number[]
   compSize: number[]
+  /** While a trial runs, the splits it made, so they can be taken back. See `trial`. */
+  journal?: Split[]
+}
+
+/** One split of a segment a–b at a new node i, with the link lists of a and b as they were. */
+interface Split {
+  i: number
+  a: number
+  b: number
+  prevA: { to: number; w: number }[]
+  prevB: { to: number; w: number }[]
 }
 
 const key = (p: LonLat) => `${p[0].toFixed(7)},${p[1].toFixed(7)}`
@@ -124,6 +135,7 @@ export function splitAt(g: Graph, hit: Hit): number {
   const wb = localDistanceM(g.nodes[b] as LonLat, q)
   const adjA = g.adj[a] as { to: number; w: number }[]
   const adjB = g.adj[b] as { to: number; w: number }[]
+  g.journal?.push({ i, a, b, prevA: adjA, prevB: adjB })
   g.adj[a] = adjA.filter((e) => e.to !== b).concat({ to: i, w: wa })
   g.adj[b] = adjB.filter((e) => e.to !== a).concat({ to: i, w: wb })
   g.adj.push([{ to: a, w: wa }, { to: b, w: wb }])
@@ -131,6 +143,30 @@ export function splitAt(g: Graph, hit: Hit): number {
   g.comp.push(c)
   g.compSize[c] = (g.compSize[c] as number) + 1
   return i
+}
+
+/**
+ * Run `fn` and then take back every split it made, newest first, so the network is exactly as it was.
+ * Previews of an edit, sent many times a second while a point is dragged, use it so they leave no trace.
+ */
+export function trial<T>(g: Graph, fn: () => T): T {
+  const outer = g.journal
+  const mine: Split[] = []
+  g.journal = mine
+  try {
+    return fn()
+  } finally {
+    for (let k = mine.length - 1; k >= 0; k--) {
+      const { a, b, prevA, prevB } = mine[k] as Split
+      g.adj[a] = prevA
+      g.adj[b] = prevB
+      g.nodes.pop()
+      g.adj.pop()
+      const c = g.comp.pop() as number
+      g.compSize[c] = (g.compSize[c] as number) - 1
+    }
+    g.journal = outer
+  }
 }
 
 /**
