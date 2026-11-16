@@ -1,26 +1,16 @@
 // A print check a screen printer would do: thin lines, small text, and how many inks the design needs.
 // Thresholds come from printers' artwork guides (docs/RESEARCH.md): lines at least 1 pt, 2 pt for light
 // ink on a dark shirt, and text at least 8 pt. Printers differ, so the check advises and never blocks.
-import { applyInks } from '../map/inks'
+import { applyInks, luminance } from '../map/inks'
 import { MM_PER_PT, normColor, textSizes } from '../map/scene'
 import { LAYER_NAMES, LAYER_ORDER, type Frame, type Pin, type RouteItem, type SceneStats, type Style } from '../map/types'
+
+export { luminance }
 
 export interface PrintCheck {
   /** Every distinct ink the file uses, shirt colour excluded when the background is left out. */
   inks: string[]
   warnings: string[]
-}
-
-/** Relative luminance, 0 (black) to 1 (white). */
-export function luminance(hex: string): number {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex)
-  if (!m) return 0
-  const n = parseInt(m[1] as string, 16)
-  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
-    const v = c / 255
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
-  })
-  return 0.2126 * (ch[0] as number) + 0.7152 * (ch[1] as number) + 0.0722 * (ch[2] as number)
 }
 
 /**

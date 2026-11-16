@@ -51,6 +51,7 @@ export function HelpDialog({ onClose, onQuickStart }: { onClose: () => void; onQ
             <li>Ask the club for a GPX of each route. In Strava on the web, open the run, then the ⋯ menu, then Export GPX.</li>
             <li>To change a drawn route, press D. Drag a point to move it, drag the line or a + to add a detour, and click a point to remove it. Only the stretch beside the point is drawn again.</li>
             <li>If drawing along roads takes a long way round, the map is missing a path there. Undo, switch to Straight, and click again.</li>
+            <li>Turn on a scale bar, a compass and the coordinates in the Text tab, then pick a corner of the map or the text band for them. The scale bar is always true to the map, and picks a new round length as you zoom.</li>
             <li>Screen printers need lines of at least 1 pt, 2 pt for light ink on a dark shirt, and text of at least 8 pt. The print check watches for both.</li>
             <li>Map data © OpenStreetMap contributors, under the Open Database License. Keep the credit on the print or the shirt’s tag.</li>
           </ul>

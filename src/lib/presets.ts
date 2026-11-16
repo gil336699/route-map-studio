@@ -1,7 +1,7 @@
 // Starting looks, drawn from real running-club and race-map designs (see docs/RESEARCH.md).
 // A look sets every colour and the composition, but never the user's own text.
 import { defaultInks } from '../map/inks'
-import type { Detail, Frame, LayerId, Style, TextStyle } from '../map/types'
+import type { Detail, Frame, Furniture, LayerId, Style, TextStyle } from '../map/types'
 
 type LayerRow = { show: boolean; color: string; widthPt: number }
 const L = (show: boolean, color: string, widthPt: number): LayerRow => ({ show, color, widthPt })
@@ -27,6 +27,18 @@ const TEXT: TextStyle = {
   heroValue: '',
   legend: false,
   credit: true,
+}
+
+/** No scale bar, compass or coordinates until the user asks for them, so older designs print as they did. */
+export const FURNITURE: Furniture = {
+  scale: false,
+  scaleStyle: 'bracket',
+  compass: false,
+  compassStyle: 'arrow',
+  place: 'bottom-right',
+  coords: false,
+  coordFormat: 'dm',
+  coordsOf: 'center',
 }
 
 /** No names typed yet: the key uses each icon's own name (see ICONS). */
@@ -56,6 +68,7 @@ function look(
       pinColor: more.pinColor,
       legendNames: { ...LEGEND_NAMES },
       text: { ...TEXT, ...more.text },
+      furniture: { ...FURNITURE },
       separatePaths: false,
       inkLimit: 0,
       inkColors: ['#111111', '#e4572e', '#888888'],

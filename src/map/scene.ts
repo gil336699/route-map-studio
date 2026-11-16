@@ -5,31 +5,34 @@
 // the file really prints.
 import { haversineKm, makeProjection, pathLengthKm } from './geo'
 import { ICON_PATHS, ICON_SCALE, ICONS, type BadgeIcon } from './icons'
-import { applyInks } from './inks'
+import { compass, coordsAt, coordsLine, formatCoords, scaleBar, type Box, type Mark, type Pen, type Piece, type ScaleInput } from './furniture'
+import { applyInks, luminance } from './inks'
+import { KM_PER_MI, MIN_TEXT_MM, MM_PER_PT, textWidth } from './measure'
 import { routeLine } from './route'
 import { clipLine, clipRing, lineLength, ringArea, simplifyLine } from './simplify'
 import {
   LAYER_NAMES,
   LAYER_ORDER,
+  type CompassStyle,
   type Detail,
   type Feature,
   type Frame,
+  type FurniturePlace,
   type LayerId,
   type LonLat,
   type Pin,
   type PinIcon,
   type RouteItem,
+  type ScaleStyle,
   type SceneStats,
   type Style,
   type XY,
 } from './types'
 
-export const MM_PER_PT = 25.4 / 72
-export const KM_PER_MI = 1.609344
+export { KM_PER_MI, MM_PER_PT, textWidth } from './measure'
 /** Share of the page height that the text band takes when the text sits below the map. */
 export const BAND = 0.2
 const FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif"
-const MIN_TEXT_MM = 8 * MM_PER_PT
 
 const fmt = (n: number) => String(Math.round(n * 100) / 100)
 const num = (p: XY) => `${fmt(p[0])} ${fmt(p[1])}`
@@ -94,16 +97,6 @@ export function pointsAlong(line: LonLat[], stepKm: number): { at: LonLat; km: n
     walked += seg
   }
   return out
-}
-
-/** Rough width of a line of bold capitals, for layout. Digits and full stops are narrower, CJK wider. */
-export function textWidth(s: string, size: number): number {
-  let w = 0
-  for (const ch of s) {
-    const code = ch.codePointAt(0) ?? 0
-    w += code >= 0x2e80 ? 1 : ch === '.' || ch === ' ' || ch === '·' ? 0.3 : /[0-9]/.test(ch) ? 0.58 : ch === 'M' || ch === 'W' ? 0.86 : 0.66
-  }
-  return w * size
 }
 
 export interface SceneInput {
@@ -225,8 +218,10 @@ export function buildScene(input: SceneInput): Scene {
   if (markers) groups.push(`<g id="distance-markers" data-name="Distance markers"${clip}>${markers}</g>`)
   const pinSvg = buildPins(pins, proj.toMm, rect, style, frame, clip, ctx)
   if (pinSvg) groups.push(pinSvg)
-  const text = buildText(routes, routeKm, pins, frame, map, style, ctx)
+  const plan = planFurniture(frame, style, routes, routeKm)
+  const text = buildText(routes, routeKm, pins, frame, map, style, plan, ctx)
   if (text) groups.push(text)
+  groups.push(...drawFurniture(plan, style, ctx))
   if (style.text.credit) groups.push(buildCredit(frame, style, ctx))
 
   const W = fmt(frame.widthMm)
@@ -445,13 +440,6 @@ export function iconSvg(icon: PinIcon, color: string, knock: string, px = 20): s
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`
 }
 
-interface Box {
-  x0: number
-  y0: number
-  x1: number
-  y1: number
-}
-
 const overlaps = (a: Box, b: Box) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1
 
 /** Pick a label spot next to a pin: right, left, above or below, the first that is free and on the page. */
@@ -550,7 +538,7 @@ export function legendIcons(pins: Pin[]): BadgeIcon[] {
   return out
 }
 
-function buildText(routes: RouteItem[], routeKm: number[], pins: Pin[], frame: Frame, map: Frame, style: Style, ctx: Ctx): string {
+function buildText(routes: RouteItem[], routeKm: number[], pins: Pin[], frame: Frame, map: Frame, style: Style, plan: FurniturePlan, ctx: Ctx): string {
   const t = style.text
   if (!t.show) return ''
   const W = frame.widthMm
@@ -577,9 +565,26 @@ function buildText(routes: RouteItem[], routeKm: number[], pins: Pin[], frame: F
   // Rounded down to the 0.01 mm the file is written in, so a fitted line never ends up a hair too wide.
   const fit = (s: string, size: number, width: number, factor = 1) =>
     Math.max(0.1, Math.floor(Math.min(size, width / Math.max(0.01, textWidth(s, 1) * factor)) * 100) / 100)
+  /**
+   * The room the scale bar, compass and coordinates take beside a line of text set at `y` and at most
+   * `size` high: on the left and on the right of the band. Lines above or below them keep the full width.
+   */
+  const room = (y: number, size: number) => {
+    const gap = W * 0.03
+    let l = 0
+    let r = 0
+    for (const b of plan.band) {
+      // Capitals reach 0.74 of the size above the line, and a fifth of the size below it stays clear.
+      if (b.y1 < y - size * 0.74 || b.y0 > y + size * 0.2) continue
+      if (b.x0 + b.x1 < W) l = Math.max(l, b.x1 - W * 0.06 + gap)
+      else r = Math.max(r, W * 0.94 - b.x0 + gap)
+    }
+    return { l, r }
+  }
 
   const title = t.title.trim()
-  const subtitle = t.subtitle.trim()
+  // Centred text takes the coordinates at the end of its subtitle line.
+  const subtitle = [t.subtitle.trim(), plan.subtitleCoords].filter(Boolean).join(' · ')
   const units = style.distance.units
   const firstKm = routeKm.find((k) => k > 0) ?? 0
   const legendItems = (t.legend ? legendIcons(pins) : []).map((icon) => ({ icon, name: legendName(style, icon).trim().toUpperCase() }))
@@ -607,51 +612,65 @@ function buildText(routes: RouteItem[], routeKm: number[], pins: Pin[], frame: F
     // A race-shirt layout: the distance as a huge number, with the title stacked beside it.
     const value = typed || (units === 'mi' ? firstKm / KM_PER_MI : firstKm).toFixed(1)
     const x0 = W * 0.06
-    // The number takes at most 55% of the width, so the words always have room beside it.
-    const hero = fit(value, band * 0.95, W * 0.55)
-    const heroW = textWidth(value, hero)
     const baseline = top + band * 0.9
+    // The number takes at most 55% of the width, less what sits at the right, so the words always have room beside it.
+    const hero = fit(value, band * 0.95, Math.min(W * 0.55, Math.max(W * 0.25, W * 0.63 - room(baseline, band * 0.95).r)))
+    const heroW = textWidth(value, hero)
     items.push(el('hero', x0, baseline, '', 800, hero, ` letter-spacing="${fmt(-hero * 0.02)}"`, escapeXml(value)))
     extent(x0, x0 + heroW)
     const x1 = x0 + heroW + W * 0.025
-    const avail = W * 0.94 - x1
+    /** The width for words beside the number, on a line at `y`. */
+    const avail = (y: number, size: number) => Math.max(W * 0.1, W * 0.94 - x1 - room(y, size).r)
     const unitLabel = units === 'mi' ? 'MILES' : 'KM'
-    const unitSize = fit(unitLabel, Math.min(Math.max(base.stats * 1.1, MIN_TEXT_MM), cap.stats * 1.2), avail, 1.1)
+    const unitMax = Math.min(Math.max(base.stats * 1.1, MIN_TEXT_MM), cap.stats * 1.2)
+    const unitSize = fit(unitLabel, unitMax, avail(baseline, unitMax), 1.1)
     items.push(el('hero-unit', x1, baseline, '', 800, unitSize, ` letter-spacing="${fmt(unitSize * 0.1)}"`, unitLabel))
     extent(x1, x1 + textWidth(unitLabel, unitSize) * 1.1)
     let y = top + band * 0.38
     if (title) {
-      const size = fit(title, Math.min(base.title * 0.62, cap.title * 0.7), avail)
+      const max = Math.min(base.title * 0.62, cap.title * 0.7)
+      const size = fit(title, max, avail(y, max))
       items.push(el('title', x1, y, '', 800, size, '', escapeXml(title)))
       extent(x1, x1 + textWidth(title, size))
       y += Math.min(base.subtitle, cap.subtitle) * 1.6
     }
     if (subtitle) {
-      const size = fit(subtitle, Math.min(base.subtitle, cap.subtitle), avail, 0.85)
+      const max = Math.min(base.subtitle, cap.subtitle)
+      const size = fit(subtitle, max, avail(y, max), 0.85)
       items.push(el('subtitle', x1, y, '', 500, size, '', escapeXml(subtitle)))
       extent(x1, x1 + textWidth(subtitle, size) * 0.85)
       y += size * 1.5
     }
     if (legendItems.length) {
       const w = legendWidth(legendBase)
-      const size = w > avail ? legendBase * (avail / w) : legendBase
+      const ly = Math.min(y + legendBase * 0.4, baseline - unitSize * 1.6)
+      const room_ = avail(ly, legendBase)
+      const size = w > room_ ? legendBase * (room_ / w) : legendBase
       items.push(legendAt(x1, Math.min(y + size * 0.4, baseline - unitSize * 1.6), size))
     }
   } else {
     const center = t.align === 'center'
     const x = center ? W / 2 : W * 0.06
-    const avail = W * 0.88
     const anchor = center ? ' text-anchor="middle"' : ''
     const span = (w: number): [number, number] => (center ? [x - w / 2, x + w / 2] : [x, x + w])
+    /** The width a line at `y` may take. Centred text stays centred, so it gives up the room on both sides. */
+    const avail = (y: number, size: number) => {
+      const { l, r } = room(y, size)
+      return Math.max(W * 0.2, W * 0.88 - (center ? 2 * Math.max(l, r) : l + r))
+    }
     if (title) {
       // Long titles shrink to fit the page instead of running off it.
-      const size = fit(title, Math.min(base.title, cap.title), avail)
-      items.push(el('title', x, top + band * 0.45, anchor, 800, size, '', escapeXml(title)))
+      const y = top + band * 0.45
+      const max = Math.min(base.title, cap.title)
+      const size = fit(title, max, avail(y, max))
+      items.push(el('title', x, y, anchor, 800, size, '', escapeXml(title)))
       extent(...span(textWidth(title, size)))
     }
     if (subtitle) {
-      const size = fit(subtitle, Math.min(base.subtitle, cap.subtitle), avail, 0.85)
-      items.push(el('subtitle', x, top + band * 0.66, anchor, 500, size, '', escapeXml(subtitle)))
+      const y = top + band * 0.66
+      const max = Math.min(base.subtitle, cap.subtitle)
+      const size = fit(subtitle, max, avail(y, max), 0.85)
+      items.push(el('subtitle', x, y, anchor, 500, size, '', escapeXml(subtitle)))
       extent(...span(textWidth(subtitle, size) * 0.85))
     }
     let statsEnd = x
@@ -662,25 +681,31 @@ function buildText(routes: RouteItem[], routeKm: number[], pins: Pin[], frame: F
         ? formatDistance(drawn[0]?.km ?? 0, units)
         : drawn.map((d) => `${d.r.name.toUpperCase()} ${formatDistance(d.km, units)}`).join('   ·   ')
     }
+    const statsY = top + band * 0.85
+    const statsMax = Math.min(base.stats, cap.stats)
+    const statsAvail = avail(statsY, statsMax)
     // The key shares the stats line when there is room for both, and takes its own line when not.
     const keyW = legendItems.length ? legendWidth(legendBase) : 0
-    const shareRow = !center && statsLine && keyW > 0 && textWidth(statsLine, Math.min(base.stats, cap.stats)) * 1.12 + W * 0.04 + keyW <= avail
+    const shareRow = !center && statsLine && keyW > 0 && textWidth(statsLine, statsMax) * 1.12 + W * 0.04 + keyW <= statsAvail
     if (statsLine) {
-      const size = fit(statsLine, Math.min(base.stats, cap.stats), shareRow ? avail - keyW - W * 0.04 : avail, 1.12)
-      items.push(el('stats', x, top + band * 0.85, anchor, 700, size, ` letter-spacing="${fmt(size * 0.08)}"`, escapeXml(statsLine)))
+      const size = fit(statsLine, statsMax, shareRow ? statsAvail - keyW - W * 0.04 : statsAvail, 1.12)
+      items.push(el('stats', x, statsY, anchor, 700, size, ` letter-spacing="${fmt(size * 0.08)}"`, escapeXml(statsLine)))
       const w = textWidth(statsLine, size) * 1.12
       extent(...span(w))
       statsEnd = x + w
     }
     if (legendItems.length) {
-      const size = keyW > avail ? legendBase * (avail / keyW) : legendBase
+      const ly = shareRow || !statsLine ? statsY : top + band * 0.97
+      const lAvail = shareRow ? statsAvail : avail(ly, legendBase)
+      const size = keyW > lAvail ? legendBase * (lAvail / keyW) : legendBase
       const w = legendWidth(size)
-      const lx = shareRow ? W * 0.94 - w : center ? W / 2 - w / 2 : x
-      const ly = shareRow || !statsLine ? top + band * 0.85 : top + band * 0.97
+      const lx = shareRow ? W * 0.94 - room(ly, legendBase).r - w : center ? W / 2 - w / 2 : x
       items.push(legendAt(Math.max(lx, shareRow ? statsEnd + W * 0.04 : 0), ly, size))
     }
   }
-  if (!items.length) return ''
+  // Over the map, the plate also goes behind whatever sits in the band.
+  if (t.placement === 'over') for (const b of plan.band) extent(b.x0, b.x1)
+  if (!items.length && !(plan.band.length && t.placement === 'over')) return ''
   if (t.placement === 'over' && right > left) {
     // A plate in the knockout colour behind the text, so the type reads over busy streets. It prints as no ink.
     const pad = W * 0.03
@@ -691,6 +716,199 @@ function buildText(routes: RouteItem[], routeKm: number[], pins: Pin[], frame: F
     items.unshift(`<rect id="text-backing" data-name="Text backing" x="${fmt(x0)}" y="${fmt(top + band * 0.08)}" width="${fmt(x1 - x0)}" height="${fmt(frame.heightMm - (top + band * 0.08))}" fill="${knock}"/>`)
   }
   return `<g id="text" data-name="Text">${items.join('')}</g>`
+}
+
+// ---- The scale bar, compass and coordinates ----
+
+type Corner = Exclude<FurniturePlace, 'band'>
+const FURNITURE_NAMES = { 'scale-bar': 'Scale bar', compass: 'Compass', coordinates: 'Coordinates' } as const
+type FurnitureId = keyof typeof FURNITURE_NAMES
+
+/** Where the scale bar, compass and coordinates land on this page. */
+export interface FurniturePlan {
+  /** Each piece placed on the page, with the knockout halo it needs (0 where it sits on empty shirt). */
+  pieces: { id: FurnitureId; piece: Piece; halo: number }[]
+  /** The boxes they take in the text band, so the lines beside them make room. */
+  band: Box[]
+  /** For centred text, the coordinates go at the end of the subtitle line instead. */
+  subtitleCoords: string
+}
+
+/** Label size and line width for the furniture. Light ink on a dark shirt gets 2 pt lines, as the print check asks. */
+export function furniturePen(frame: Frame, style: Style): Pen {
+  const paper = normColor(knockout(style))
+  const ink = normColor(safeColor(style.text.color, '#111111'))
+  const heavy = luminance(paper) < 0.2 && luminance(ink) > luminance(paper)
+  return { size: Math.max(textSizes(frame).small * 0.9, MIN_TEXT_MM), min: MIN_TEXT_MM, line: (heavy ? 2 : 1.25) * MM_PER_PT }
+}
+
+/** A piece built at the origin, then moved so its box starts at (x, y) or, when `right`, ends at x. */
+function placed(build: (x: number, y: number) => Piece, x: number, y: number, right: boolean): Piece {
+  const probe = build(0, 0).box
+  return build(x - (right ? probe.x1 : probe.x0), y - probe.y0)
+}
+
+/** A piece built at the origin, then moved so its box ends at x (or starts there) and sits on y. */
+function seated(build: (x: number, y: number) => Piece, x: number, bottom: number, right: boolean): Piece {
+  const probe = build(0, 0).box
+  return build(x - (right ? probe.x1 : probe.x0), bottom - probe.y1)
+}
+
+/**
+ * Lay out the scale bar, compass and coordinates. In a corner of the map they stack, compass on top, lined
+ * up on that corner's side, with a halo so they read over the streets. In the text band they sit under the
+ * title's line, so a long title keeps the whole width: at the right for text on the left, the coordinates
+ * opposite the subtitle or under the other two; and at both ends for centred text, which takes the
+ * coordinates into its subtitle. Without text there is no band, so all of them go to the corner (bottom
+ * right when the band was asked for).
+ */
+export function planFurniture(frame: Frame, style: Style, routes: RouteItem[], routeKm: number[]): FurniturePlan {
+  const fu = style.furniture
+  const t = style.text
+  const plan: FurniturePlan = { pieces: [], band: [], subtitleCoords: '' }
+  if (!fu.scale && !fu.compass && !fu.coords) return plan
+  const W = frame.widthMm
+  const map = mapFrame(frame, style)
+  const pen = furniturePen(frame, style)
+  const scaleIn: ScaleInput = { style: fu.scaleStyle, mmPerKm: frame.widthMm / frame.widthKm, mapKm: frame.widthKm, units: style.distance.units, pen }
+  const coords = fu.coords ? formatCoords(coordsAt(frame, routes, fu.coordsOf), fu.coordFormat) : ''
+  const band = t.show
+  const inBand = band && fu.place === 'band' && (fu.scale || fu.compass)
+
+  if (band && (inBand || coords)) {
+    const top = t.placement === 'below' ? map.heightMm : frame.heightMm * (1 - BAND)
+    const h = frame.heightMm * BAND
+    const hero = t.hero && (!!t.heroValue.trim() || routeKm.some((k) => k > 0))
+    const centred = t.align === 'center' && !hero
+    // Everything here sits clear under the title's line, so the title keeps the whole width.
+    const titleMax = hero ? Math.min(textSizes(frame).title * 0.62, h * 0.28) : Math.min(textSizes(frame).title, h * 0.4)
+    const ceiling = top + h * (hero ? 0.38 : 0.45) + titleMax * 0.25
+    const statsY = top + h * 0.85
+    const add = (id: FurnitureId, piece: Piece) => {
+      plan.pieces.push({ id, piece, halo: 0 })
+      plan.band.push(piece.box)
+    }
+    /** A compass shrunk, if need be, to fit between the ceiling and `bottom`. */
+    const fitted = (x: number, bottom: number, right: boolean) => {
+      const full = compass(fu.compassStyle, 0, 0, pen).box
+      const k = Math.min(1, Math.max(0.4, (bottom - ceiling) / (full.y1 - full.y0)))
+      return seated((cx, y) => compass(fu.compassStyle, cx, y, pen, k), x, bottom, right)
+    }
+    if (centred) {
+      if (coords) plan.subtitleCoords = coords
+      if (inBand) {
+        // Centred text keeps its middle: the compass at the left end, a shorter scale bar at the right.
+        if (fu.compass) add('compass', fitted(W * 0.06, statsY, false))
+        if (fu.scale) add('scale-bar', seated((x, y) => scaleBar({ ...scaleIn, share: 1 / 7 }, x, y), W * 0.94, statsY, true))
+      }
+    } else {
+      let bottom = statsY
+      if (coords) {
+        const size = Math.max(Math.min(textSizes(frame).stats, h * 0.13) * 0.82, MIN_TEXT_MM)
+        // Opposite the subtitle, or on the bottom line when the scale bar and compass sit above it.
+        const line = coordsLine(coords, W * 0.94, inBand ? statsY : top + h * 0.66, size, 'end')
+        add('coordinates', line)
+        if (inBand) bottom = line.box.y0 - pen.size * 0.9
+      }
+      if (inBand) {
+        let edge = W * 0.94
+        if (fu.compass) {
+          const c = fitted(edge, bottom, true)
+          add('compass', c)
+          edge = c.box.x0 - pen.size * 1.6
+        }
+        if (fu.scale) add('scale-bar', seated((x, y) => scaleBar(scaleIn, x, y), edge, bottom, true))
+      }
+    }
+  }
+
+  // The corner stack: compass, then scale bar, then the coordinates when there is no band for them.
+  const stack: { id: FurnitureId; build: (x: number, y: number) => Piece }[] = []
+  if (!inBand && fu.compass) stack.push({ id: 'compass', build: (x, y) => compass(fu.compassStyle, x, y, pen) })
+  if (!inBand && fu.scale) stack.push({ id: 'scale-bar', build: (x, y) => scaleBar(scaleIn, x, y) })
+  if (!band && coords) stack.push({ id: 'coordinates', build: (x, y) => coordsLine(coords, x, y, pen.size, 'start') })
+  if (stack.length) {
+    const corner: Corner = fu.place === 'band' ? 'bottom-right' : fu.place
+    const right = corner.endsWith('right')
+    // A rounded frame's corners are cut away, so the stack sits further in to stay on the map.
+    const short = Math.min(map.widthMm, map.heightMm)
+    const m = style.shape === 'rounded' ? Math.max(W * 0.04, short * 0.03 + short * 0.06 * 0.3 + pen.size * 0.6) : W * 0.04
+    // Text over the map covers its bottom fifth, so the bottom corners sit above it.
+    const floor = band && t.placement === 'over' ? frame.heightMm * (1 - BAND) : map.heightMm
+    const gaps = stack.map((it) => (it.id === 'compass' ? pen.size * 1.6 : pen.size * 0.9))
+    const heights = stack.map((it) => {
+      const b = it.build(0, 0).box
+      return b.y1 - b.y0
+    })
+    const total = heights.reduce((a, b) => a + b, 0) + gaps.slice(0, -1).reduce((a, b) => a + b, 0)
+    let y = corner.startsWith('bottom') ? floor - m - total : m
+    stack.forEach((it, i) => {
+      plan.pieces.push({ id: it.id, piece: placed(it.build, right ? map.widthMm - m : m, y, right), halo: pen.size * 0.22 })
+      y += (heights[i] as number) + (gaps[i] as number)
+    })
+  }
+  return plan
+}
+
+interface Paint {
+  ink: string
+  accent: string
+  knock: string
+}
+
+/** Marks as SVG: a halo in the knockout colour behind them when `halo` is above 0, then the ink. */
+function marksSvg(marks: Mark[], c: Paint, halo: number, ctx: Ctx): string {
+  let back = ''
+  let front = ''
+  for (const m of marks) {
+    if (m.kind === 'path') {
+      const fill = m.fill === 'accent' ? c.accent : m.fill === 'ink' ? c.ink : 'none'
+      if (halo) back += `<path d="${m.d}" fill="${m.fill ? c.knock : 'none'}" stroke="${c.knock}" stroke-width="${fmt((m.stroke ?? 0) + halo * 2)}"/>`
+      if (m.fill) ctx.use(fill)
+      if (m.stroke) ctx.use(c.ink)
+      front += `<path d="${m.d}" fill="${fill}"${m.stroke ? ` stroke="${c.ink}" stroke-width="${fmt(m.stroke)}"` : ''}/>`
+    } else {
+      const anchor = m.anchor === 'start' ? '' : ` text-anchor="${m.anchor}"`
+      const attrs = `x="${fmt(m.x)}" y="${fmt(m.y)}"${anchor} font-family="${FONT}" font-weight="${m.weight}" font-size="${fmt(m.size)}"${m.spacing ? ` letter-spacing="${fmt(m.spacing)}"` : ''}`
+      ctx.text(m.size)
+      if (halo && !m.knockout) back += `<text ${attrs} fill="${c.knock}" stroke="${c.knock}" stroke-width="${fmt(halo * 2)}">${escapeXml(m.text)}</text>`
+      ctx.use(m.knockout ? c.knock : c.ink)
+      front += `<text ${attrs} fill="${m.knockout ? c.knock : c.ink}">${escapeXml(m.text)}</text>`
+    }
+  }
+  if (halo) ctx.use(c.knock)
+  return back + front
+}
+
+/** Draw the plan, each piece in its own group, so it arrives in Illustrator ready to move or delete. */
+function drawFurniture(plan: FurniturePlan, style: Style, ctx: Ctx): string[] {
+  const c: Paint = { ink: safeColor(style.text.color, '#111111'), accent: safeColor(style.pinColor, '#e4572e'), knock: knockout(style) }
+  return plan.pieces.map(({ id, piece, halo }) =>
+    `<g id="${id}" data-name="${FURNITURE_NAMES[id]}" stroke-linecap="round" stroke-linejoin="round">${marksSvg(piece.marks, c, halo, ctx)}</g>`)
+}
+
+const PREVIEW_PEN: Pen = { size: 3, min: 2.4, line: 0.55 }
+const NO_CTX: Ctx = { use: () => {}, text: () => {} }
+
+function previewSvg(piece: Piece, c: Paint, w: number, h: number): string {
+  const b = piece.box
+  const pad = 1.2
+  const vb = `${fmt(b.x0 - pad)} ${fmt(b.y0 - pad)} ${fmt(b.x1 - b.x0 + pad * 2)} ${fmt(b.y1 - b.y0 + pad * 2)}`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${vb}" aria-hidden="true"><g stroke-linecap="round" stroke-linejoin="round">${marksSvg(piece.marks, c, 0, NO_CTX)}</g></svg>`
+}
+
+/** A scale bar style drawn small for the picker in the app, showing one round unit. The same drawing as the print. */
+export function scalePreviewSvg(style: ScaleStyle, units: 'km' | 'mi', ink: string, w: number, h: number): string {
+  const unit = units === 'mi' ? KM_PER_MI : 1
+  const piece = scaleBar({ style, units, mmPerKm: 30 / unit, mapKm: 4 * unit, pen: PREVIEW_PEN }, 0, 0)
+  const c = safeColor(ink, '#111111')
+  return previewSvg(piece, { ink: c, accent: c, knock: c }, w, h)
+}
+
+/** A compass style drawn small for the picker in the app. The same drawing as the print. */
+export function compassPreviewSvg(style: CompassStyle, ink: string, accent: string, knock: string, w: number, h: number): string {
+  const c = { ink: safeColor(ink, '#111111'), accent: safeColor(accent, '#e4572e'), knock: safeColor(knock, '#ffffff') }
+  return previewSvg(compass(style, 0, 0, PREVIEW_PEN), c, w, h)
 }
 
 /** The OpenStreetMap credit, small and up the right edge, where it never meets the type. */

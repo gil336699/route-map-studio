@@ -1,7 +1,7 @@
 // Project files: settings, routes and pins, with a schema name and version so old files keep opening.
 import { DEFAULT_DETAIL, DEFAULT_STYLE } from './presets'
 import { ICONS } from '../map/icons'
-import { LAYER_ORDER, type Detail, type Frame, type LegKind, type LonLat, type Pin, type Route, type RouteItem, type Style } from '../map/types'
+import { LAYER_ORDER, type Detail, type Frame, type Furniture, type LegKind, type LonLat, type Pin, type Route, type RouteItem, type Style } from '../map/types'
 import type { Unit } from './units'
 
 export const SCHEMA = 'route-map-studio.project'
@@ -67,6 +67,18 @@ function readStyle(v: unknown): Style {
     }
   }
   const r = obj(s.route)
+  const fu = obj(s.furniture)
+  const df = d.furniture
+  const furniture: Furniture = {
+    scale: bool(fu.scale, df.scale),
+    scaleStyle: oneOf(fu.scaleStyle, ['bracket', 'ruler', 'checker', 'dual'] as const, df.scaleStyle),
+    compass: bool(fu.compass, df.compass),
+    compassStyle: oneOf(fu.compassStyle, ['arrow', 'split', 'badge', 'rose'] as const, df.compassStyle),
+    place: oneOf(fu.place, ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'band'] as const, df.place),
+    coords: bool(fu.coords, df.coords),
+    coordFormat: oneOf(fu.coordFormat, ['dm', 'decimal', 'dms'] as const, df.coordFormat),
+    coordsOf: oneOf(fu.coordsOf, ['center', 'start'] as const, df.coordsOf),
+  }
   const di = obj(s.distance)
   const t = obj(s.text)
   const ln = obj(s.legendNames)
@@ -106,6 +118,7 @@ function readStyle(v: unknown): Style {
       legend: bool(t.legend, d.text.legend),
       credit: bool(t.credit, d.text.credit),
     },
+    furniture,
     separatePaths: bool(s.separatePaths, d.separatePaths),
     inkLimit: s.inkLimit === 1 || s.inkLimit === 2 || s.inkLimit === 3 ? s.inkLimit : 0,
     inkColors: ink,

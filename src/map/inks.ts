@@ -5,6 +5,18 @@ import { LAYER_ORDER, type LayerId, type RouteItem, type Style } from './types'
 
 export type InkLimit = 0 | 1 | 2 | 3
 
+/** Relative luminance, 0 (black) to 1 (white). */
+export function luminance(hex: string): number {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex)
+  if (!m) return 0
+  const n = parseInt(m[1] as string, 16)
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+    const v = c / 255
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * (ch[0] as number) + 0.7152 * (ch[1] as number) + 0.0722 * (ch[2] as number)
+}
+
 /** What each ink is used for, by limit. Shown in the app next to the ink colour pickers. */
 export const INK_ROLES: Record<1 | 2 | 3, string[]> = {
   1: ['Everything'],

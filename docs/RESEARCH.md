@@ -32,6 +32,17 @@ The app's print check uses 1 pt, 2 pt light-on-dark and 8 pt. It counts inks wit
 - OpenStreetMap has gaps. At the Girard Avenue Bridge the sidewalk doesn't connect to the MLK Drive trail 65 m away, so "follow roads" went 700 m the long way round. The app now says so with the numbers, and suggests drawing that bit straight.
 - There are 324 landmarks in the Art Museum area (209 cafés, 69 museums, 31 sights, 15 water fountains). 12 lie within 200 m of the stand-in loop, including the Philadelphia Museum of Art, Cosmic Cafe, Boathouse Row and the Rocky Steps.
 
+## Scale bar, compass and position (0.3.0)
+
+Cartography guides agree on three things, and the city-poster tools add a fourth.
+
+- **Scale bar: one round length, few parts, numbers above.** The longest distance should be a round number (1,000 m, 1 mile, 5 km), with parts at a half, a quarter or a fifth of it, and no odd decimals. The numbers go above the bar. The bar should be easy to find but low in the hierarchy: fine lines, small but readable text. A bar stays right when the print is scaled, which a ratio such as 1:25,000 does not (Ordnance Survey, Esri, QGIS). The app picks the round length nearest a quarter of the map's width, never more than a third, in the print's units (metres under a kilometre).
+- **Compass: small, simple, in the map's style.** A plain arrow beats an elaborate rose, and on a large-scale map where north is up it can be left out (Ordnance Survey, Audubon, Esri, John Nelson). North is always up on this app's maps, so the compass is a design touch on a shirt, and the plain arrow is the default. The rose is there for vintage looks.
+- **Position.** City posters set the coordinates as one letter-spaced line near the place name, such as 39°58′ N 75°11′ W. Degrees and minutes are within about 1.5 km, decimal degrees to four places within about 10 m, and seconds within about 30 m.
+- **Print.** The same rules as everything else on the shirt: lines of at least 1 pt (2 pt for light ink on a dark shirt) and text of at least 8 pt. Helvetica Neue, Helvetica and Arial all have the degree sign and the prime marks (′ and ″), so the coordinates print in the file's own font.
+
+The mood board (four scale bars, four compasses, three places for them and three ways to write the position, drawn on a real 12 × 14 in print on a navy shirt) is in `local/moodboard-v3/` (not in git). The pick: all four of each as options, a corner the user picks or the text band, and degrees and minutes.
+
 ## Sources
 
 Running-club shirts and printing:
@@ -57,3 +68,12 @@ OpenStreetMap to Illustrator:
 - [OSM2CDR: OpenStreetMap to SVG](https://osm2cdr.com/formats/svg/), [MapVectorizer](https://app.mapvectorizer.com/)
 - [Atlas: OpenStreetMap to Illustrator](https://atlas.co/blog/open-street-map-to-illustrator/), [Atlas: how to make a city map poster](https://atlas.co/blog/how-to-make-a-city-map-poster/)
 - [Let's make some vector maps (Medium)](https://medium.com/@sinclarius/lets-make-some-vector-maps-792481d5f328), [Maperitive](http://maperitive.net/)
+
+Scale bars, north arrows and coordinates:
+- [Ordnance Survey: scale](https://docs.os.uk/more-than-maps/geographic-data-visualisation/guide-to-cartography/scale) and [north arrows](https://docs.os.uk/more-than-maps/geographic-data-visualisation/guide-to-cartography/north-arrows)
+- [Esri: choosing the best way to indicate map scale](https://www.esri.com/arcgis-blog/products/product/mapping/choosing-the-best-way-to-indicate-map-scale), [north arrow necessity](https://www.esri.com/arcgis-blog/products/arcgis-pro/mapping/north-arrow-necessity)
+- [Audubon cartography guide: map elements](https://carto-guide-audubon.hub.arcgis.com/pages/make-good-maps-elements)
+- [John Nelson: put a north arrow on it?](https://adventuresinmapping.com/2021/10/27/put-a-north-arrow-on-it/)
+- [Penn State GEOG 486: marginalia design](https://courses.ems.psu.edu/geog486/node/513)
+- [Time & Spatial: scale bars, north arrows and grids](https://www.timeandspatial.com/study/map-design/scale-bars-north-arrows-and-grids)
+- [A scale bar that stays accurate in QGIS](https://arijolma.org/how-to-add-a-scale-bar-that-stays-accurate-in-qgis/)

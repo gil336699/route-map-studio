@@ -1,9 +1,13 @@
-// Text: the club name, a subtitle, the distance (as a line or a huge number) and a key for the icons.
+// Text: the club name, a subtitle, the distance (as a line or a huge number), a key for the icons, and
+// the scale bar, compass and coordinates.
 import type { Doc } from '../../lib/doc'
+import { coordsAt, formatCoords } from '../../map/furniture'
 import { ICONS, type BadgeIcon } from '../../map/icons'
-import { formatDistance, legendIcons, legendName } from '../../map/scene'
-import type { TextStyle } from '../../map/types'
+import { applyInks } from '../../map/inks'
+import { compassPreviewSvg, formatDistance, legendIcons, legendName, scalePreviewSvg } from '../../map/scene'
+import type { CompassStyle, CoordFormat, Furniture, ScaleStyle, TextStyle } from '../../map/types'
 import { ColorField, Group, Row, Segmented, Switch, TextField } from '../Controls'
+import { PlacePicker, StylePicker } from '../FurnitureControls'
 
 interface Props {
   doc: Doc
@@ -14,6 +18,24 @@ interface Props {
 const LABEL = new Map(ICONS.map((i) => [i.id, `${i.label} icon`]))
 const iconLabel = (k: BadgeIcon) => LABEL.get(k) ?? 'Icon'
 
+const SCALES: { value: ScaleStyle; label: string; tip: string }[] = [
+  { value: 'bracket', label: 'Bracket', tip: 'One round length between two ticks, such as 1 MILE. The quietest, like a city poster.' },
+  { value: 'ruler', label: 'Ruler', tip: 'Ticks along the length, with 0, half way and the end numbered. Like a track ruler.' },
+  { value: 'checker', label: 'Checkered', tip: 'The classic atlas bar: parts filled and empty in turn.' },
+  { value: 'dual', label: 'Miles and km', tip: 'Kilometres above the line and miles below, for runners who think in both.' },
+]
+const COMPASSES: { value: CompassStyle; label: string; tip: string }[] = [
+  { value: 'arrow', label: 'Arrow', tip: 'A bold N over a slim arrow. Simple and small.' },
+  { value: 'split', label: 'Split', tip: 'A half-filled arrowhead: the classic map north arrow.' },
+  { value: 'badge', label: 'Badge', tip: 'A round badge in the pin colour with the N knocked out, like the pins.' },
+  { value: 'rose', label: 'Rose', tip: 'A compass rose with N, E, S and W. The decorative, vintage choice.' },
+]
+const FORMATS: { value: CoordFormat; name: string }[] = [
+  { value: 'dm', name: 'Degrees and minutes, the usual poster style' },
+  { value: 'decimal', name: 'Decimal degrees, as a phone shows them' },
+  { value: 'dms', name: 'Degrees, minutes and seconds' },
+]
+
 export function TextPanel({ doc, edit, firstKm }: Props) {
   const t = doc.style.text
   const limited = doc.style.inkLimit > 0
@@ -21,6 +43,13 @@ export function TextPanel({ doc, edit, firstKm }: Props) {
   const units = doc.style.distance.units
   const auto = firstKm > 0 ? (units === 'mi' ? firstKm / 1.609344 : firstKm).toFixed(1) : ''
   const icons = legendIcons(doc.pins)
+  const fu = doc.style.furniture
+  const setFu = (patch: Partial<Furniture>) => edit((d) => ({ ...d, style: { ...d.style, furniture: { ...d.style.furniture, ...patch } } }))
+  // The pickers show each style in the colours it prints in, inks and all.
+  const printed = applyInks(doc.style, doc.routes).style
+  const knock = printed.transparent ? printed.shirt : printed.background
+  const hasStart = doc.routes.some((r) => r.route.points.length > 0)
+  const at = coordsAt(doc.frame, doc.routes, fu.coordsOf)
 
   return (
     <>
@@ -51,6 +80,40 @@ export function TextPanel({ doc, edit, firstKm }: Props) {
               </Row>
             ))
           : null}
+      </Group>
+
+      <Group title="Scale, compass and position" hint="Printed in the text colour, so they add no ink.">
+        <Switch label="Scale bar" checked={fu.scale} onChange={(v) => setFu({ scale: v })}
+          tip="A round distance, such as 1 mile, drawn at the map's true scale. It picks a new length as you zoom." />
+        {fu.scale ? (
+          <StylePicker label="Scale bar style" value={fu.scaleStyle} onChange={(v) => setFu({ scaleStyle: v })} shirt={knock} wide
+            options={SCALES.map((o) => ({ ...o, svg: scalePreviewSvg(o.value, units, printed.text.color, 150, 34) }))} />
+        ) : null}
+        <Switch label="Compass" checked={fu.compass} onChange={(v) => setFu({ compass: v })} tip="A north arrow. North is always at the top of this map." />
+        {fu.compass ? (
+          <StylePicker label="Compass style" value={fu.compassStyle} onChange={(v) => setFu({ compassStyle: v })} shirt={knock}
+            options={COMPASSES.map((o) => ({ ...o, svg: compassPreviewSvg(o.value, printed.text.color, printed.pinColor, knock, 60, 40) }))} />
+        ) : null}
+        {fu.scale || fu.compass || (fu.coords && !t.show) ? (
+          <Row label="Where" tip="Pick a corner of the map, or the text band.">
+            <PlacePicker value={fu.place} onChange={(v) => setFu({ place: v })} band={t.show} />
+          </Row>
+        ) : null}
+        <Switch label="Coordinates" checked={fu.coords} onChange={(v) => setFu({ coords: v })}
+          tip={`The map's position as a line of text, such as ${formatCoords(at, fu.coordFormat)}. It goes in the text band, or with the scale bar when the text is off.`} />
+        {fu.coords ? (
+          <>
+            <Segmented label="Coordinates format" value={fu.coordFormat} onChange={(v) => setFu({ coordFormat: v })}
+              options={FORMATS.map((f) => {
+                const text = formatCoords(at, f.value)
+                return { value: f.value, label: text.slice(0, text.search(/ [NS] /) + 2), tip: `${f.name}: ${text}.` }
+              })} />
+            <Segmented label="Coordinates of" value={fu.coordsOf} onChange={(v) => setFu({ coordsOf: v })} options={[
+              { value: 'center', label: 'Map centre', tip: 'The middle of the map. It moves as you move the map.' },
+              { value: 'start', label: 'Route start', tip: hasStart ? "Where the first route starts, such as the club's meeting spot." : 'Draw a route first. Until then this gives the map centre.' },
+            ]} />
+          </>
+        ) : null}
       </Group>
 
       <Group title="Layout">

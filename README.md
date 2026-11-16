@@ -1,6 +1,6 @@
 # Route Map Studio
 
-Route Map Studio is a browser app that turns a running club's route into a print-ready map for a T-shirt. Find the place, draw the route by clicking along the streets and drag it into shape (or import a GPX from Strava), tick the cafés, stations and landmarks along it, pick a look, and hold it to 1, 2 or 3 inks for a cheaper screen print. Export a real-size SVG for Illustrator, with one named group per layer and live text, or a 300 dpi PNG. Map data comes from OpenStreetMap.
+Route Map Studio is a browser app that turns a running club's route into a print-ready map for a T-shirt. Find the place, draw the route by clicking along the streets and drag it into shape (or import a GPX from Strava), tick the cafés, stations and landmarks along it, pick a look, add a scale bar, a compass and the coordinates, and hold it to 1, 2 or 3 inks for a cheaper screen print. Export a real-size SVG for Illustrator, with one named group per layer and live text, or a 300 dpi PNG. Map data comes from OpenStreetMap.
 
 **Use it online:** https://gil336699.github.io/route-map-studio/
 
@@ -45,14 +45,14 @@ Every control describes itself, with its shortcut, when you hover over it or Tab
 3. **Edit.** Still in Draw, drag a point to move it, drag the line (or a +) to add a detour, and click a point to remove it. Only the stretches beside the point are drawn again, each the way it was drawn, along the streets or straight. A click on the line itself adds the next point at the end, for a route that goes back the way it came. **[** and **]** step through the points by keyboard, and Delete removes the one picked. An imported GPX track stays exactly as recorded.
 4. **Landmarks.** The Route tab lists what is near the routes: cafés, bakeries, ice cream, bars and breweries, restaurants, museums, monuments, sights, parks, bridges, stadiums, stations, water and restrooms. Tick the ones to show; each comes in with its own icon. Press **P** and click for a pin of your own, such as the club's meeting point or a company's office, and pick its icon from 41, or set it to **Text only** for a street name.
 5. **Look.** Pick a starting look. For screen printing, set **Inks** to 1, 2 or 3: every colour is mapped onto that many inks, and the shirt shows through as the background. Adjust the layers, line weights, frame and detail.
-6. **Text.** Type the club name and a subtitle. Turn on **Big number** for a race-shirt distance like 13.1, typed or taken from the route, and **Show a key** to name the icons ("Coffee stops").
+6. **Text.** Type the club name and a subtitle. Turn on **Big number** for a race-shirt distance like 13.1, typed or taken from the route, and **Show a key** to name the icons ("Coffee stops"). Add a **Scale bar**, a **Compass** and the **Coordinates**, pick a style for each from tiles that show it as it prints, and pick where they go: a corner of the map, or the text band.
 7. **Export.** Choose the print size (12 × 14 in for a shirt back by default) and press **Export SVG**. **Save project** keeps the routes, pins and settings to open later.
 
 ### Working with Illustrator
 
-The SVG opens at real size. Each layer is a named group: Background, Parks, Water, Railways, Paths and trails, Streets, Main roads, one group per route, Distance markers, Pins, Text and the OpenStreetMap credit. With **Keep each road separate** off (the default), each layer is one compound path, which keeps the file small and Illustrator quick; turn it on to edit streets one by one. A circle or rounded frame is a clipping mask. Text is live, set in Helvetica Neue, so you can swap in the club's font.
+The SVG opens at real size. Each layer is a named group: Background, Parks, Water, Railways, Paths and trails, Streets, Main roads, one group per route, Distance markers, Pins, Text, Scale bar, Compass, Coordinates and the OpenStreetMap credit. With **Keep each road separate** off (the default), each layer is one compound path, which keeps the file small and Illustrator quick; turn it on to edit streets one by one. A circle or rounded frame is a clipping mask. Text is live, set in Helvetica Neue, so you can swap in the club's font.
 
-Knockouts (the outline around a route, the cut-outs in icons, the halo behind labels, and the plate behind text over the map) are filled with the shirt colour. They print as no ink: tell the printer, or delete them and set the shapes to knock out in your separations.
+Knockouts (the outline around a route, the cut-outs in icons, the halo behind labels and behind the scale bar and compass on the map, and the plate behind text over the map) are filled with the shirt colour. They print as no ink: tell the printer, or delete them and set the shapes to knock out in your separations.
 
 ## Feature reference
 
@@ -92,11 +92,22 @@ Parks drop out under an ink limit, since they would need an ink of their own. A 
 
 The rules come from printers' artwork guides, which differ, so the check advises and never blocks. Confirm with the printer.
 
+### Scale bar, compass and coordinates
+
+| Part | Styles | Notes |
+| --- | --- | --- |
+| Scale bar | Bracket, Ruler, Checkered, Miles and km | A round length (such as 0.5, 1, 2 or 2.5 of the units, or metres under a kilometre) nearest a quarter of the map's width, never more than a third. Drawn at the print's true scale, and picked again when you zoom. |
+| Compass | Arrow, Split, Badge, Rose | North is always at the top of the map. The badge prints in the pin colour, the rest in the text colour. |
+| Coordinates | 39°58′ N, 39.9689° N, 39°58′08″ N | Degrees and minutes, decimal degrees, or seconds, of the map's centre or the start of the first route. |
+| Where | Four map corners, or the text band | In a corner: compass over the scale bar, with a knockout halo, above the text when the text is over the map. In the band: under the title's line; with centred text, the compass at one end and a shorter scale bar at the other. The coordinates go in the band (in the subtitle, for centred text), or under the scale bar when the text is off. |
+
+All three print in the text colour, so they add no ink, with lines of 2 pt for light ink on a dark shirt and text of at least 8 pt.
+
 ### Exports
 
 | Export | Contents | Units |
 | --- | --- | --- |
-| SVG | The print as shown: one named group per layer, routes, markers, pins with icons, the text, the key and the OpenStreetMap credit. | mm, at real size |
+| SVG | The print as shown: one named group per layer, routes, markers, pins with icons, the text, the key, the scale bar, compass and coordinates, and the OpenStreetMap credit. | mm, at real size |
 | PNG | The same, at 300 dpi (3600 × 4200 px for 12 × 14 in). | px |
 | Project | The page, the look, every route and pin, as `.route-map.json` (schema `route-map-studio.project`, version 1). The map downloads again when it is opened. | degrees and mm |
 
@@ -125,6 +136,10 @@ The rules come from printers' artwork guides, which differ, so the check advises
 | Words | Title (shrinks to fit), subtitle, colour. |
 | Distance | Big number (typed, or the first route's length) or a distance line naming each route. |
 | Key | Names each pin icon in use, by what it marks (Stations, Offices) until you type another name. |
+| Scale bar | On or off, in four styles. |
+| Compass | On or off, in four styles. |
+| Where | A corner of the map, or the text band (off, and says why, while the text is off). |
+| Coordinates | On or off; degrees and minutes, decimal or seconds; the map's centre or the route's start. |
 | Layout | Text below the map or over it (on a plate in the shirt colour); left or centred. |
 | Print size, Units | Presets for shirt backs and fronts, pockets, Letter, A4 and square, or any size; mm, in, pt or px. The map keeps its width on the ground. |
 | OpenStreetMap credit | Small, up the right edge. Turn it off if the credit goes on the shirt's tag. |
@@ -156,8 +171,9 @@ The page sends the map engine requests in a Web Worker, so downloading, reading 
 2. **Route.** The streets, paths and trails (but not motorways) form a graph. A click lands on the nearest point of a street within 200 m, preferring the connected network the previous point is on, and that street is split there, so a point sits exactly where it was clicked. Dijkstra's algorithm finds the shortest way from the previous point. A click farther than 200 m from any street (in a river, say) stays where it was made and joins with a straight line, and the status says so.
 3. **Edit.** Each stretch remembers how it was made: along the streets, straight, or an imported track. Moving, inserting or removing a point draws again only the stretches that meet it, each its own way, so the rest of the route stays exactly as it was. While a point is dragged, the engine works the new route out again on every move (one request at a time, the newest winning) without touching the street graph: the splits a preview makes are taken back at once. Undo keeps the last 200 changes, each naming the one route or pin it touched.
 4. **Draw.** Each feature is projected onto the page in millimetres with a local flat projection, simplified (Douglas-Peucker), clipped to the page, and short lines and small shapes are dropped. The SVG is built as text; the preview shows that same text, so exports hold exactly what the view shows.
-5. **Inks.** With an ink limit, colours are mapped onto the inks by role before drawing. As the SVG is written, every ink it uses and the smallest text it sets are noted, so the print check reports what the file really prints.
-6. **Servers.** Each public Overpass server gets 100 s. A busy, slow or broken one passes the download to the next (overpass-api.de, then overpass.private.coffee, then overpass.kumi.systems), and when all are busy the app waits 20 s and goes round once more, as Overpass asks. The status says what is happening, and Stop works at any point.
+5. **Scale and position.** The projection has one scale across the page, the page width over the width on the ground, so the scale bar is that many millimetres per kilometre times a round length. The scale bar, compass and coordinates are built as shapes and words with a box round each, then stacked in the corner picked, or set in the text band, where each line of text gives room only to what sits beside it.
+6. **Inks.** With an ink limit, colours are mapped onto the inks by role before drawing. As the SVG is written, every ink it uses and the smallest text it sets are noted, so the print check reports what the file really prints.
+7. **Servers.** Each public Overpass server gets 100 s. A busy, slow or broken one passes the download to the next (overpass-api.de, then overpass.private.coffee, then overpass.kumi.systems), and when all are busy the app waits 20 s and goes round once more, as Overpass asks. The status says what is happening, and Stop works at any point.
 
 **Limits, honestly.** The projection is flat, which is accurate to well under 1 % across a city but not across a country. Map data is only as good as OpenStreetMap: a missing footbridge or a path joined to nothing sends routing the long way round, and the app says so with the numbers. Text sizes are estimated for layout, so a very long title or label in a narrow space can still crowd its neighbours.
 
@@ -175,6 +191,9 @@ The page sends the map engine requests in a Web Worker, so downloading, reading 
 | Files | SVG 45 to 210 KB for a 12 × 14 in print with one compound path per layer (89 KB in the QA run). PNG at 300 dpi: 3600 × 4200 px, 1.8 MB, made in 0.2 s. |
 | Area | Up to 40 km across. Large areas download slowly and may be refused by the server. |
 | Text | Every line of text shrinks to fit its row; very long words on a small page can fall below 8 pt, and the print check then says so. |
+| Scale bar | True to 0.05 mm on a 12 × 14 in print 7.5 km across (1 mile drawn 65.05 mm, against 65.06 mm). The flat projection is accurate to well under 1 % across a city. |
+| Band | With the coordinates in the band too, the compass shrinks to fit under the title's line, to about two thirds on a 12 × 14 in print. Pick a corner for a bigger one. On a circle frame, a corner stack can reach over the circle's edge. |
+| Drawing them | The scale bar, compass and coordinates add under 0.5 ms and 3 to 6 KB to a 12 × 14 in picture of central Philadelphia (11.0 ms off, 11.2 to 11.3 ms on, best of 7). |
 
 ## Development
 
@@ -188,7 +207,7 @@ npm run preview   # serve the production build
 
 | Folder | What is there |
 | --- | --- |
-| `src/map/` | The engine, plain TypeScript: projection, simplify and clip, OSM parsing, routing graph, routes and route editing, landmarks, pin icons, inks and the SVG scene. |
+| `src/map/` | The engine, plain TypeScript: projection, simplify and clip, OSM parsing, routing graph, routes and route editing, landmarks, pin icons, the scale bar, compass and coordinates, inks and the SVG scene. |
 | `src/lib/` | Overpass and Nominatim requests, project files, presets and looks, units, print check, files, document helpers, undo and redo, the worker hook, and the card the print shows while it waits for a map. |
 | `src/worker/` | The map engine worker and its messages. |
 | `src/components/` | The interface: viewport, panels, dock, top bar, print check, dialogs, tooltip layer and controls. |

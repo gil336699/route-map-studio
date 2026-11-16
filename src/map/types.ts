@@ -127,6 +127,30 @@ export interface TextStyle {
   credit: boolean
 }
 
+/** How the scale bar looks: one length between two ticks, a ruler, an atlas bar, or kilometres over miles. */
+export type ScaleStyle = 'bracket' | 'ruler' | 'checker' | 'dual'
+/** How the compass looks: an arrow, a half-filled arrowhead, a round badge, or a compass rose. */
+export type CompassStyle = 'arrow' | 'split' | 'badge' | 'rose'
+/** Where the scale bar and compass go: one corner of the map, or the text band. */
+export type FurniturePlace = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'band'
+/** How coordinates are written: degrees and minutes, decimal degrees, or degrees, minutes and seconds. */
+export type CoordFormat = 'dm' | 'decimal' | 'dms'
+
+/** The scale bar, the compass and the coordinates (map furniture, as cartographers say). Each one can be on or off. */
+export interface Furniture {
+  scale: boolean
+  scaleStyle: ScaleStyle
+  compass: boolean
+  compassStyle: CompassStyle
+  /** Where the scale bar and compass go. The band needs the text on; without it they take the bottom-right corner. */
+  place: FurniturePlace
+  /** The map's position, as a line of text. It goes in the text band, or with the scale bar when there is no text. */
+  coords: boolean
+  coordFormat: CoordFormat
+  /** The spot the coordinates give: the map's centre, or the start of the first route. */
+  coordsOf: 'center' | 'start'
+}
+
 export interface Style {
   background: string
   /** Leave the background out of the file, so the shirt shows through. */
@@ -141,6 +165,7 @@ export interface Style {
   /** What each pin icon means, for the legend, where the user named it. Others use the icon's own name. */
   legendNames: Partial<Record<BadgeIcon, string>>
   text: TextStyle
+  furniture: Furniture
   /** Keep every road and shape as its own path instead of one compound path per layer. */
   separatePaths: boolean
   /** Hold the design to 1, 2 or 3 inks for screen printing. 0 means any number of colours. */

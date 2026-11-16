@@ -386,6 +386,33 @@ input.color::-moz-color-swatch { border: 0; border-radius: 50%; }
 .look-swatch i { display: block; height: 2px; border-radius: 2px; }
 .look-swatch i.thick { height: 5px; }
 .look-name { font-size: 11.5px; text-align: center; line-height: 1.2; }
+
+/* Scale bar and compass styles, each a tile showing it as it prints. */
+.style-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.style-pick.wide { grid-template-columns: repeat(2, 1fr); }
+.style-tile { border: 0; background: transparent; padding: 4px; border-radius: 12px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; color: inherit; font: inherit; min-height: 28px; }
+.style-tile:hover { background: var(--control); }
+.style-tile.on { box-shadow: 0 0 0 2px var(--accent); }
+.style-art { height: 44px; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 4px 6px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); overflow: hidden; }
+.style-art svg { display: block; max-width: 100%; max-height: 100%; }
+.style-name { font-size: 11.5px; text-align: center; line-height: 1.2; }
+
+/* Where the scale bar and compass go: a small page with its four map corners and the text band. */
+.place-pick { display: grid; gap: 3px; width: 132px; }
+.place-map { position: relative; height: 74px; border-radius: 10px; background: var(--control); }
+.place-map .spot { position: absolute; width: 32px; height: 32px; border: 0; padding: 0; border-radius: 8px; background: transparent; cursor: pointer; display: grid; place-items: center; }
+.place-map .spot:hover { background: var(--control-hover); }
+.place-map .spot.top-left { left: 3px; top: 3px; }
+.place-map .spot.top-right { right: 3px; top: 3px; }
+.place-map .spot.bottom-left { left: 3px; bottom: 3px; }
+.place-map .spot.bottom-right { right: 3px; bottom: 3px; }
+.place-map .spot span { width: 10px; height: 10px; border-radius: 3px; background: var(--muted); opacity: 0.45; transition: transform 0.15s; }
+.place-map .spot[aria-checked='true'] span { background: var(--accent); opacity: 1; transform: scale(1.35); }
+.place-band { border: 0; border-radius: 8px; min-height: 28px; background: var(--control); color: inherit; font: inherit; font-size: 11.5px; font-weight: 500; cursor: pointer; }
+.place-band:hover { background: var(--control-hover); }
+.place-band[aria-checked='true'] { background: var(--seg-on); box-shadow: inset 0 0 0 2px var(--accent); }
+.place-band[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+.place-band[aria-disabled='true']:hover { background: var(--control); }
 .layer { display: flex; align-items: center; gap: 8px; font-size: 13px; min-height: 32px; }
 .layer-name { flex: 1; min-width: 0; }
 
@@ -465,7 +492,10 @@ kbd { font: 11px var(--font); background: var(--control); border-radius: 5px; pa
 
 /* Bigger targets for fingers */
 @media (pointer: coarse) {
-  .btn, .segmented > button, .chip { min-height: 40px; }
+  .btn, .segmented > button, .chip, .place-band { min-height: 40px; }
+  .place-pick { width: 156px; }
+  .place-map { height: 92px; }
+  .place-map .spot { width: 40px; height: 40px; }
   .btn.icon { width: 40px; }
   input.switch { width: 52px; height: 32px; }
   input.switch::after { width: 28px; height: 28px; }

@@ -1,7 +1,7 @@
 {
   "name": "route-map-studio",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Turn a running route into a print-ready, layered map for a T-shirt.",
   "license": "MIT",
   "type": "module",

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 2026-11-16
+
+- A scale bar, in the Text tab. It shows a round distance at the map's true scale, such as 1 mile on a map 7.5 km across, and picks a new length when you zoom (0.5 miles at 3 km). Under a kilometre it counts in metres. Four styles, each shown as a tile as it prints: **Bracket**, one length between two ticks; **Ruler**; **Checkered**, the atlas bar; and **Miles and km**, kilometres above the line and miles below.
+- A compass in four styles: **Arrow**, a bold N over a slim arrow; **Split**, the half-filled arrowhead; **Badge**, a round badge in the pin colour, like the pins; and **Rose**, with N, E, S and W.
+- **Where** they go, picked on a small page: one of the map's four corners, or the text band. In a corner the compass stacks over the scale bar, with a knockout halo so they read over the streets, and with the text over the map they stay above it. In the band they sit under the title's line, so the title keeps its full width, and only the lines beside them make room. Centred text puts the compass at one end and a shorter scale bar at the other. With the text off they go to the bottom-right corner, and the band button says why it is off.
+- The map's position, as one letter-spaced line such as 39°58′ N 75°11′ W. It goes at the right of the text band, opposite the subtitle, or under the scale bar and compass when they are in the band too. Centred text adds it to the subtitle, and without text it joins the scale bar in its corner. Write it in degrees and minutes, decimal degrees or seconds, for the map's centre or the start of the first route.
+- All three print in the text colour (the badge in the pin colour), so they add no ink. Their lines are 2 pt for light ink on a dark shirt, as the print check asks, and their text is never under 8 pt. Each is its own group in the SVG: Scale bar, Compass and Coordinates.
+- Projects keep them, and a new look keeps them. Files from 0.2 open with all three off, so older designs print as they did.
+
 ## 0.2.1 2026-11-16
 
 - A new demo at the top of the README, and as a video on the release, showing what 0.2 added. In the example loop along the Schuylkill, the Draw tool drags a point off the Benjamin Franklin Parkway onto 20th Street and drags the line down 19th Street into a detour, with the dashed preview showing during each drag. A point is removed, then ⌘Z brings it back. A bakery and a bridge are ticked from the new kinds of landmark, and a pin dropped at the start gets the start and finish flag from the new icon picker. Then come the Marathon shirt look and the SVG export. Before, the demo was from 0.1.1 and showed none of the editing, the new icons or the new kinds of landmark. Like that one, it was recorded with a saved copy of the OpenStreetMap data, so its download is quicker than one from the public servers.

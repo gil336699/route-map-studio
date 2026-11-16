@@ -82,8 +82,8 @@ export function setBuildings(doc: Doc, on: boolean): Doc {
 }
 
 /**
- * Apply a look: its colours, frame and layout. The user's own words, distance units, ink limit and
- * buildings stay, and routes are recoloured in order.
+ * Apply a look: its colours, frame and layout. The user's own words, distance units, ink limit,
+ * buildings, scale bar, compass and coordinates stay, and routes are recoloured in order.
  */
 export function applyLook(doc: Doc, look: Look): Doc {
   const mine = doc.style
@@ -93,6 +93,7 @@ export function applyLook(doc: Doc, look: Look): Doc {
     layers: { ...lookLayers, buildings: { ...lookLayers.buildings, show: doc.buildings } },
     inkLimit: mine.inkLimit,
     legendNames: { ...mine.legendNames },
+    furniture: { ...mine.furniture },
     distance: { ...look.style.distance, units: mine.distance.units },
     text: {
       ...look.style.text,
