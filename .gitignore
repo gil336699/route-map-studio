@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+.env*
+local/
+*.gpx
+*.route-map.json
+.DS_Store
